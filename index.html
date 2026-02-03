@@ -242,10 +242,15 @@ async function registerUser() {
 
     // 準備資料
     const payload = {
-        mode: 'registerUser',
-        spreadsheetId: SPREADSHEET_ID, // 🔹 傳送指定的 Google Sheet ID
+        // ✅ 關鍵修改：同時發送 type, mode, action 滿足不同後端寫法
+        type: 'register',              
+        mode: 'register',              
+        action: 'register',            
+        
+        spreadsheetId: SPREADSHEET_ID, // 🔹 Google Sheet ID
         userId: currentUserId,         // 🔹 LINE UserID
-        displayName: name,             // 🔹 姓名
+        name: name,                    // ✅ 增加 name 欄位 (許多後端使用 name 而非 displayName)
+        displayName: name,             // 保留 displayName
         phone: phone,                  // 🔹 電話
         role: '管理員',                 // 🔹 權限 (預設寫入管理員)
         pictureUrl: userProfile?.pictureUrl || '',
@@ -279,7 +284,7 @@ async function registerUser() {
 
     } catch (err) {
         console.error('Register Error:', err);
-        alert('註冊失敗，請稍後再試：' + err.message);
+        alert('註冊失敗：' + err.message);
         setBtnLoading(false);
     }
 }
