@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>TDEA 活動管理系統 - 管理員註冊</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 引入 FontAwesome 圖標 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    /* 動畫設定 */
+    .fade-in { animation: fadeIn .4s ease-in-out forwards; }
+    @keyframes fadeIn { from{opacity:0; transform: translateY(10px);} to{opacity:1; transform: translateY(0);} }
+    .hidden { display: none !important; }
+    
+    /* LINE 風格綠色按鈕漸層 */
+    .btn-line { background: linear-gradient(to right, #06c755, #05b34c); }
+    .btn-line:active { background: #049f43; transform: scale(0.98); }
+    
+    /* 輸入框聚焦樣式 */
+    .input-field:focus { border-color: #06c755; box-shadow: 0 0 0 3px rgba(6, 199, 85, 0.2); }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center p-4 font-sans text-gray-700">
+
+  <!-- 🟢 Loading / Splash 畫面 -->
+  <div id="splash" class="flex flex-col items-center justify-center w-full max-w-sm mx-auto text-center space-y-6 fade-in">
+    <div class="relative w-24 h-24 bg-white rounded-2xl shadow-lg flex items-center justify-center mb-4">
+      <i class="fa-solid fa-calendar-check text-4xl text-green-500"></i>
+    </div>
+    <div class="space-y-2">
+      <h2 class="text-xl font-bold text-gray-800">TDEA 活動管理系統</h2>
+      <div class="flex items-center justify-center space-x-2 text-green-600 text-sm font-medium">
+        <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span>系統連線中...</span>
+      </div>
+    </div>
+    <div id="debugInfo" class="text-xs text-gray-400 font-mono mt-8 px-4 break-all"></div>
+  </div>
+
+  <!-- 📝 註冊表單 (預設隱藏) -->
+  <div id="registerForm" class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden hidden fade-in">
+    <!-- 表單頭部 -->
+    <div class="bg-green-500 p-6 text-center text-white relative">
+        <h1 class="text-xl font-bold tracking-wide">管理員資料註冊</h1>
+        <p class="text-green-100 text-sm mt-1">請確認您的基本資料</p>
+        
+        <!-- 大頭貼顯示區 -->
+        <div class="absolute -bottom-8 left-1/2 transform -translate-x-1/2">
+            <div class="w-16 h-16 rounded-full border-4 border-white bg-gray-200 overflow-hidden shadow-md">
+                <img id="userAvatar" src="https://via.placeholder.com/150" alt="Avatar" class="w-full h-full object-cover">
+            </div>
+        </div>
+    </div>
+
+    <!-- 表單內容 -->
+    <div class="pt-12 pb-8 px-6 space-y-4">
+      
+      <!-- 顯示 User ID -->
+      <div class="text-center mb-4">
+        <p id="displayName" class="font-bold text-gray-800 text-lg">載入中...</p>
+        <p id="userIdDisplay" class="text-xs text-gray-400 font-mono"></p>
+        <span class="inline-block mt-1 px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded-full">申請權限：管理員</span>
+      </div>
+
+      <!-- 姓名欄位 -->
+      <div class="space-y-1">
+        <label class="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">真實姓名</label>
+        <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <i class="fa-regular fa-user text-gray-400"></i>
+            </div>
+            <input id="name" type="text" placeholder="請輸入您的姓名" 
+                class="input-field w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50 outline-none transition-all text-gray-700 placeholder-gray-400">
+        </div>
+      </div>
+
+      <!-- 電話欄位 -->
+      <div class="space-y-1">
+        <label class="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">手機號碼</label>
+        <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <i class="fa-solid fa-phone text-gray-400"></i>
+            </div>
+            <input id="phone" type="tel" placeholder="0912345678" maxlength="10"
+                class="input-field w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50 outline-none transition-all text-gray-700 placeholder-gray-400">
+        </div>
+      </div>
+
+      <!-- 按鈕區域 -->
+      <div class="pt-4">
+        <button id="registerBtn" onclick="registerUser()" class="btn-line w-full text-white py-3.5 rounded-xl font-bold text-lg shadow-lg shadow-green-200 transition-all flex items-center justify-center space-x-2">
+            <span id="btnText">確認註冊</span>
+            <div id="btnSpinner" class="hidden animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+        </button>
+      </div>
+      
+      <p class="text-center text-xs text-gray-400 mt-4">
+        點擊註冊即表示您同意本系統的使用條款
+      </p>
+    </div>
+  </div>
+
+<script>
+/* ==========================================
+   ⚙️ 系統設定區
+   ========================================== */
+const LIFF_ID        = '2005868456-cfANNVou';     
+const WORKER_URL     = 'https://delicate-math-7e61.fangwl591021.workers.dev/'; 
+const NEXT_PAGE      = 'main.html';
+// 🔹 指定寫入的 Google Sheet ID
+const SPREADSHEET_ID = '1qJ900hzX1nuN4D2wprXtoknfWOfU8wFrRd4-T3eiGkA';
+
+/* ==========================================
+   🛠️ 工具函式庫
+   ========================================== */
+const $ = id => document.getElementById(id);
+const mask = u => u ? (u.slice(0,8)+'****') : '';
+
+// Debug 訊息顯示
+function updateDebug(msg){ 
+    console.log('🔍', msg);
+}
+
+// UI 切換
+function showForm() {
+    $('splash').classList.add('hidden');
+    $('registerForm').classList.remove('hidden');
+}
+
+// 按鈕狀態控制
+function setBtnLoading(isLoading) {
+    const btn = $('registerBtn');
+    const text = $('btnText');
+    const spinner = $('btnSpinner');
+    
+    btn.disabled = isLoading;
+    if (isLoading) {
+        text.classList.add('hidden');
+        spinner.classList.remove('hidden');
+        btn.classList.add('opacity-70', 'cursor-not-allowed');
+    } else {
+        text.classList.remove('hidden');
+        spinner.classList.add('hidden');
+        btn.classList.remove('opacity-70', 'cursor-not-allowed');
+    }
+}
+
+// 全域變數
+let currentUserId = null;
+let userProfile = null;
+
+/* ==========================================
+   🚀 主程式流程
+   ========================================== */
+(async function initApp() {
+    try {
+        updateDebug('啟動 LIFF 初始化...');
+        
+        await liff.init({ liffId: LIFF_ID });
+        
+        if (!liff.isLoggedIn()) {
+            updateDebug('尚未登入，導向 LINE 登入頁面...');
+            liff.login({ redirectUri: location.href });
+            return;
+        }
+
+        userProfile = await liff.getProfile();
+        currentUserId = userProfile.userId;
+        
+        updateDebug('取得用戶: ' + userProfile.displayName);
+        
+        $('userIdDisplay').textContent = `ID: ${mask(currentUserId)}`;
+        $('displayName').textContent = userProfile.displayName;
+        if (userProfile.pictureUrl) {
+            $('userAvatar').src = userProfile.pictureUrl;
+        }
+        $('name').value = userProfile.displayName;
+
+        // 檢查後端註冊狀態時，也帶上 spreadsheetId 以防後端需要
+        await checkRegistrationStatus(currentUserId);
+
+    } catch (err) {
+        console.error('App Error:', err);
+        updateDebug('❌ 發生錯誤: ' + err.message);
+        alert('系統初始化失敗，請檢查網路連線或稍後再試。\n' + err.message);
+    }
+})();
+
+// 📡 檢查註冊狀態
+async function checkRegistrationStatus(userId) {
+    updateDebug('正在檢查註冊狀態...');
+    try {
+        // 帶上 spreadsheetId 參數 (如果後端有支援多表切換)
+        const checkUrl = `${WORKER_URL}?mode=check&userId=${encodeURIComponent(userId)}&spreadsheetId=${encodeURIComponent(SPREADSHEET_ID)}`;
+        const response = await fetch(checkUrl);
+        
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const result = await response.json();
+        
+        const isRegistered = (result.data && result.data.registered === true) || 
+                             (result.registered === true);
+
+        if (isRegistered) {
+            updateDebug('✅ 已註冊，跳轉中...');
+            localStorage.setItem('tdea_user', JSON.stringify(result.data || result.user));
+            setTimeout(() => {
+                window.location.replace(NEXT_PAGE);
+            }, 1000);
+        } else {
+            updateDebug('📝 未註冊，顯示表單');
+            showForm();
+        }
+
+    } catch (err) {
+        updateDebug('⚠️ API 連線失敗，預設顯示表單: ' + err.message);
+        console.warn('API Error, falling back to form', err);
+        showForm(); 
+    }
+}
+
+/* ==========================================
+   📝 註冊動作
+   ========================================== */
+async function registerUser() {
+    const name = $('name').value.trim();
+    const phone = $('phone').value.trim();
+
+    // 驗證
+    if (!name || !phone) {
+        alert('請填寫姓名與手機號碼');
+        return;
+    }
+    if (!/^09\d{8}$/.test(phone)) {
+        alert('請輸入正確的 10 碼手機格式');
+        return;
+    }
+
+    // 準備資料
+    const payload = {
+        mode: 'registerUser',
+        spreadsheetId: SPREADSHEET_ID, // 🔹 傳送指定的 Google Sheet ID
+        userId: currentUserId,         // 🔹 LINE UserID
+        displayName: name,             // 🔹 姓名
+        phone: phone,                  // 🔹 電話
+        role: '管理員',                 // 🔹 權限 (預設寫入管理員)
+        pictureUrl: userProfile?.pictureUrl || '',
+        timestamp: new Date().toISOString()
+    };
+
+    setBtnLoading(true);
+
+    try {
+        updateDebug('送出註冊資料...');
+        console.log('Payload:', payload); // 除錯用
+        
+        const response = await fetch(WORKER_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+        updateDebug('註冊回應: ' + JSON.stringify(result));
+
+        if (result.ok || result.status === 'success' || result.success) {
+            $('btnText').textContent = '註冊成功！';
+            localStorage.setItem('tdea_registered', 'true');
+            setTimeout(() => {
+                window.location.href = NEXT_PAGE;
+            }, 1000);
+        } else {
+            throw new Error(result.message || result.error || '伺服器回傳失敗');
+        }
+
+    } catch (err) {
+        console.error('Register Error:', err);
+        alert('註冊失敗，請稍後再試：' + err.message);
+        setBtnLoading(false);
+    }
+}
+
+// 🧪 開發測試用
+if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+    window.addEventListener('load', () => {
+        setTimeout(() => {
+            if(!$('name').value) $('name').value = '測試管理員';
+            $('phone').value = '0912345678';
+            console.log('🧪 開發模式：已自動填寫測試資料');
+        }, 1000);
+    });
+}
+</script>
+</body>
+</html>
