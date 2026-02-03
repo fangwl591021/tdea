@@ -114,7 +114,7 @@
 const LIFF_ID        = '2005868456-cfANNVou';     
 const WORKER_URL     = 'https://delicate-math-7e61.fangwl591021.workers.dev/'; 
 const NEXT_PAGE      = 'main.html';
-// 🔹 指定寫入的 Google Sheet ID
+// 🔹 指定寫入的 Google Sheet ID (確認此 ID 權限已開放給你的 GAS 腳本)
 const SPREADSHEET_ID = '1qJ900hzX1nuN4D2wprXtoknfWOfU8wFrRd4-T3eiGkA';
 
 /* ==========================================
@@ -126,6 +126,8 @@ const mask = u => u ? (u.slice(0,8)+'****') : '';
 // Debug 訊息顯示
 function updateDebug(msg){ 
     console.log('🔍', msg);
+    // 開發階段如果有問題，可以把下面這行註解打開，讓 Debug 訊息顯示在畫面上
+    // const el = $('debugInfo'); if(el) el.innerHTML += `<div>${msg}</div>`;
 }
 
 // UI 切換
@@ -183,7 +185,7 @@ let userProfile = null;
         }
         $('name').value = userProfile.displayName;
 
-        // 檢查後端註冊狀態時，也帶上 spreadsheetId 以防後端需要
+        // 檢查後端註冊狀態
         await checkRegistrationStatus(currentUserId);
 
     } catch (err) {
@@ -211,9 +213,6 @@ async function checkRegistrationStatus(userId) {
         if (isRegistered) {
             updateDebug('✅ 已註冊，跳轉中...');
             localStorage.setItem('tdea_user', JSON.stringify(result.data || result.user));
-            
-            // 可以在這裡判斷 role，如果 role 還是 "待審核"，可以導向一個 "審核中" 頁面，而不是 main.html
-            // 但依目前需求，先直接導向後台入口
             setTimeout(() => {
                 window.location.replace(NEXT_PAGE);
             }, 1000);
@@ -255,14 +254,20 @@ async function registerUser() {
         
         spreadsheetId: SPREADSHEET_ID, // 🔹 Google Sheet ID
         userId: currentUserId,         // 🔹 LINE UserID
-        name: name,                    // 🔹 姓名
-        displayName: name,             
-        phone: phone,                  // 🔹 電話
         
-        // 🔹 權限設定：設為 "待審核"，等待後台人工核准
+        // 標準欄位
+        name: name,
+        displayName: name,             
+        phone: phone,                  
         role: '待審核',                 
         
-        // 🟢 為了通過舊有後端驗證，補上無意義符號，避免 "缺少必要欄位" 錯誤
+        // 🟢 加入中文欄位 key (防止後端使用中文 key 對應)
+        "姓名": name,
+        "電話": phone,
+        "權限": "待審核",
+        "Line UserID": currentUserId,
+        
+        // 🟢 為了通過舊有後端驗證，補上無意義符號
         studentId: '-',
         department: '-',
         
@@ -275,7 +280,11 @@ async function registerUser() {
     try {
         updateDebug('送出註冊資料...');
         
-        const response = await fetch(WORKER_URL, {
+        // 🟢 關鍵修正：將 spreadsheetId 也放到 URL 參數中
+        // 這樣就算後端用 e.parameter.spreadsheetId 抓取也能抓得到
+        const postUrl = `${WORKER_URL}?spreadsheetId=${encodeURIComponent(SPREADSHEET_ID)}`;
+        
+        const response = await fetch(postUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -285,8 +294,9 @@ async function registerUser() {
         updateDebug('註冊回應: ' + JSON.stringify(result));
 
         if (result.ok || result.status === 'success' || result.success) {
-            // 成功後提示
-            alert('✅ 申請成功！\n\n您的資料已送出，請等待管理員核准您的權限後即可進入後台。');
+            // ✅ 註冊成功後，先彈出視窗讓您確認回應內容 (開發/除錯用)
+            // 確認無誤後，您可以將 JSON.stringify(result) 拿掉
+            alert('✅ 伺服器回應成功！\n\n回應內容：' + JSON.stringify(result) + '\n\n即將跳轉...');
             
             $('btnText').textContent = '申請成功';
             localStorage.setItem('tdea_registered', 'true');
