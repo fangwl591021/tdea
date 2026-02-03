@@ -3,22 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>TDEA 活動管理系統 - 用戶註冊</title>
+  <title>TDEA 活動管理系統 - 權限驗證</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- 引入 FontAwesome 圖標 -->
+  <!-- 引入 FontAwesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    /* 動畫設定 */
     .fade-in { animation: fadeIn .4s ease-in-out forwards; }
     @keyframes fadeIn { from{opacity:0; transform: translateY(10px);} to{opacity:1; transform: translateY(0);} }
     .hidden { display: none !important; }
-    
-    /* LINE 風格綠色按鈕漸層 */
     .btn-line { background: linear-gradient(to right, #06c755, #05b34c); }
     .btn-line:active { background: #049f43; transform: scale(0.98); }
-    
-    /* 輸入框聚焦樣式 */
     .input-field:focus { border-color: #06c755; box-shadow: 0 0 0 3px rgba(6, 199, 85, 0.2); }
   </style>
 </head>
@@ -27,7 +22,7 @@
   <!-- 🟢 Loading / Splash 畫面 -->
   <div id="splash" class="flex flex-col items-center justify-center w-full max-w-sm mx-auto text-center space-y-6 fade-in">
     <div class="relative w-24 h-24 bg-white rounded-2xl shadow-lg flex items-center justify-center mb-4">
-      <i class="fa-solid fa-calendar-check text-4xl text-green-500"></i>
+      <i class="fa-solid fa-shield-halved text-4xl text-green-500"></i>
     </div>
     <div class="space-y-2">
       <h2 class="text-xl font-bold text-gray-800">TDEA 活動管理系統</h2>
@@ -36,20 +31,45 @@
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
         </svg>
-        <span>系統連線中...</span>
+        <span>驗證權限中...</span>
       </div>
     </div>
     <div id="debugInfo" class="text-xs text-gray-400 font-mono mt-8 px-4 break-all"></div>
   </div>
 
-  <!-- 📝 註冊表單 (預設隱藏) -->
+  <!-- ⏳ 審核中畫面 (新增) -->
+  <div id="pendingPage" class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm text-center hidden fade-in">
+    <div class="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
+      <i class="fa-solid fa-hourglass-half text-3xl text-yellow-600"></i>
+    </div>
+    <h2 class="text-2xl font-bold text-gray-800 mb-2">權限審核中</h2>
+    <p class="text-gray-600 mb-6">您的申請已送出，請等待管理員開通後台權限。</p>
+    <div class="bg-gray-50 rounded-lg p-4 text-left text-sm text-gray-500 mb-6">
+      <p><strong>申請人：</strong> <span id="pendingName">-</span></p>
+      <p><strong>狀態：</strong> <span class="text-yellow-600 font-bold">待審核</span></p>
+    </div>
+    <button onclick="window.location.reload()" class="w-full bg-gray-200 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-300 transition-all">
+      重新整理狀態
+    </button>
+  </div>
+
+  <!-- ⛔ 無權限畫面 (新增) -->
+  <div id="accessDeniedPage" class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm text-center hidden fade-in">
+    <div class="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+      <i class="fa-solid fa-ban text-3xl text-red-600"></i>
+    </div>
+    <h2 class="text-2xl font-bold text-gray-800 mb-2">無存取權限</h2>
+    <p class="text-gray-600 mb-6">您的帳號已被停用或權限不足。</p>
+    <button onclick="window.close()" class="w-full bg-gray-200 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-300 transition-all">
+      關閉頁面
+    </button>
+  </div>
+
+  <!-- 📝 註冊表單 (未註冊才顯示) -->
   <div id="registerForm" class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden hidden fade-in">
-    <!-- 表單頭部 -->
     <div class="bg-green-500 p-6 text-center text-white relative">
         <h1 class="text-xl font-bold tracking-wide">後台權限申請</h1>
         <p class="text-green-100 text-sm mt-1">請填寫真實資料以供審核</p>
-        
-        <!-- 大頭貼顯示區 -->
         <div class="absolute -bottom-8 left-1/2 transform -translate-x-1/2">
             <div class="w-16 h-16 rounded-full border-4 border-white bg-gray-200 overflow-hidden shadow-md">
                 <img id="userAvatar" src="https://via.placeholder.com/150" alt="Avatar" class="w-full h-full object-cover">
@@ -57,19 +77,14 @@
         </div>
     </div>
 
-    <!-- 表單內容 -->
     <div class="pt-12 pb-8 px-6 space-y-4">
-      
-      <!-- 顯示 User ID -->
       <div class="text-center mb-4">
         <p id="displayName" class="font-bold text-gray-800 text-lg">載入中...</p>
-        <p id="userIdDisplay" class="text-xs text-gray-400 font-mono"></p>
         <div class="mt-2 p-2 bg-blue-50 text-blue-700 text-xs rounded-lg border border-blue-100">
-          <i class="fa-solid fa-circle-info mr-1"></i> 註冊後需等待管理員核准權限
+          <i class="fa-solid fa-circle-info mr-1"></i> 提交後需人工核准才能登入
         </div>
       </div>
 
-      <!-- 姓名欄位 -->
       <div class="space-y-1">
         <label class="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">真實姓名</label>
         <div class="relative">
@@ -81,7 +96,6 @@
         </div>
       </div>
 
-      <!-- 電話欄位 -->
       <div class="space-y-1">
         <label class="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">手機號碼</label>
         <div class="relative">
@@ -93,181 +107,165 @@
         </div>
       </div>
 
-      <!-- 按鈕區域 -->
       <div class="pt-4">
         <button id="registerBtn" onclick="registerUser()" class="btn-line w-full text-white py-3.5 rounded-xl font-bold text-lg shadow-lg shadow-green-200 transition-all flex items-center justify-center space-x-2">
             <span id="btnText">提交申請</span>
             <div id="btnSpinner" class="hidden animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
         </button>
       </div>
-      
-      <p class="text-center text-xs text-gray-400 mt-4">
-        提交即表示您同意本系統的使用規範
-      </p>
     </div>
   </div>
 
 <script>
 /* ==========================================
-   ⚙️ 系統設定區
+   ⚙️ 系統設定
    ========================================== */
 const LIFF_ID        = '2005868456-cfANNVou';     
 const WORKER_URL     = 'https://delicate-math-7e61.fangwl591021.workers.dev/'; 
 const NEXT_PAGE      = 'main.html';
-// 🔹 指定寫入的 Google Sheet ID (確認此 ID 權限已開放給你的 GAS 腳本)
 const SPREADSHEET_ID = '1qJ900hzX1nuN4D2wprXtoknfWOfU8wFrRd4-T3eiGkA';
 
 /* ==========================================
-   🛠️ 工具函式庫
+   🛠️ 工具
    ========================================== */
 const $ = id => document.getElementById(id);
 const mask = u => u ? (u.slice(0,8)+'****') : '';
+function updateDebug(msg){ console.log('🔍', msg); } // 開發時可解除註解讓手機顯示: $('debugInfo').innerHTML += `<div>${msg}</div>`;
 
-// Debug 訊息顯示
-function updateDebug(msg){ 
-    console.log('🔍', msg);
-    // 開發階段如果有問題，可以把下面這行註解打開，讓 Debug 訊息顯示在畫面上
-    // const el = $('debugInfo'); if(el) el.innerHTML += `<div>${msg}</div>`;
+function showPage(pageId) {
+    ['splash', 'registerForm', 'pendingPage', 'accessDeniedPage'].forEach(id => {
+        $(id).classList.add('hidden');
+    });
+    $(pageId).classList.remove('hidden');
 }
 
-// UI 切換
-function showForm() {
-    $('splash').classList.add('hidden');
-    $('registerForm').classList.remove('hidden');
-}
-
-// 按鈕狀態控制
 function setBtnLoading(isLoading) {
     const btn = $('registerBtn');
-    const text = $('btnText');
-    const spinner = $('btnSpinner');
-    
     btn.disabled = isLoading;
     if (isLoading) {
-        text.classList.add('hidden');
-        spinner.classList.remove('hidden');
+        $('btnText').classList.add('hidden');
+        $('btnSpinner').classList.remove('hidden');
         btn.classList.add('opacity-70', 'cursor-not-allowed');
     } else {
-        text.classList.remove('hidden');
-        spinner.classList.add('hidden');
+        $('btnText').classList.remove('hidden');
+        $('btnSpinner').classList.add('hidden');
         btn.classList.remove('opacity-70', 'cursor-not-allowed');
     }
 }
 
-// 全域變數
 let currentUserId = null;
 let userProfile = null;
 
 /* ==========================================
-   🚀 主程式流程
+   🚀 初始化流程 (嚴格權限檢查)
    ========================================== */
 (async function initApp() {
     try {
         updateDebug('啟動 LIFF 初始化...');
-        
         await liff.init({ liffId: LIFF_ID });
         
         if (!liff.isLoggedIn()) {
-            updateDebug('尚未登入，導向 LINE 登入頁面...');
             liff.login({ redirectUri: location.href });
             return;
         }
 
         userProfile = await liff.getProfile();
         currentUserId = userProfile.userId;
+        updateDebug('User: ' + userProfile.displayName);
         
-        updateDebug('取得用戶: ' + userProfile.displayName);
-        
-        $('userIdDisplay').textContent = `ID: ${mask(currentUserId)}`;
+        // 預填表單資訊
         $('displayName').textContent = userProfile.displayName;
-        if (userProfile.pictureUrl) {
-            $('userAvatar').src = userProfile.pictureUrl;
-        }
+        if (userProfile.pictureUrl) $('userAvatar').src = userProfile.pictureUrl;
         $('name').value = userProfile.displayName;
 
-        // 檢查後端註冊狀態
-        await checkRegistrationStatus(currentUserId);
+        // 🟢 檢查註冊狀態與權限
+        await checkPermission(currentUserId);
 
     } catch (err) {
-        console.error('App Error:', err);
-        updateDebug('❌ 發生錯誤: ' + err.message);
-        alert('系統初始化失敗，請檢查網路連線或稍後再試。\n' + err.message);
+        console.error('Error:', err);
+        alert('系統錯誤：' + err.message);
     }
 })();
 
-// 📡 檢查註冊狀態
-async function checkRegistrationStatus(userId) {
-    updateDebug('正在檢查註冊狀態...');
+// 📡 檢查權限核心邏輯
+async function checkPermission(userId) {
+    updateDebug('檢查權限中...');
+    
     try {
-        // 帶上 spreadsheetId 參數
         const checkUrl = `${WORKER_URL}?mode=check&userId=${encodeURIComponent(userId)}&spreadsheetId=${encodeURIComponent(SPREADSHEET_ID)}`;
         const response = await fetch(checkUrl);
-        
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const result = await response.json();
         
-        // 判斷是否已註冊
-        const isRegistered = (result.data && result.data.registered === true) || 
-                             (result.registered === true);
+        updateDebug('API 回應: ' + JSON.stringify(result));
+
+        // 1. 判斷是否註冊
+        const isRegistered = (result.data && result.data.registered === true) || (result.registered === true);
+        
+        // 2. 取得權限欄位 (假設後端回傳的物件中有 role 或 data.role 或 data['權限'])
+        let role = '';
+        const userData = result.data || result.user || {};
+        
+        if (userData.role) role = userData.role;
+        else if (userData['權限']) role = userData['權限']; // 兼容中文欄位
+        
+        updateDebug(`狀態: ${isRegistered ? '已註冊' : '未註冊'}, 權限: ${role}`);
 
         if (isRegistered) {
-            updateDebug('✅ 已註冊，跳轉中...');
-            localStorage.setItem('tdea_user', JSON.stringify(result.data || result.user));
-            setTimeout(() => {
-                window.location.replace(NEXT_PAGE);
-            }, 1000);
+            // ✅ 已註冊，進行權限分流
+            if (role === '管理員' || role === 'Admin') {
+                updateDebug('✅ 權限通過，進入後台');
+                setTimeout(() => window.location.replace(NEXT_PAGE), 800);
+            } 
+            else if (role === '待審核' || role === 'pending') {
+                updateDebug('⏳ 待審核');
+                $('pendingName').textContent = userData.name || userData.displayName || userProfile.displayName;
+                showPage('pendingPage');
+            } 
+            else {
+                updateDebug('⛔ 無權限');
+                showPage('accessDeniedPage');
+            }
         } else {
-            updateDebug('📝 未註冊，顯示表單');
-            showForm();
+            // 📝 未註冊 -> 顯示表單
+            updateDebug('未註冊，顯示表單');
+            showPage('registerForm');
         }
 
     } catch (err) {
-        updateDebug('⚠️ API 連線失敗，預設顯示表單: ' + err.message);
-        console.warn('API Error, falling back to form', err);
-        showForm(); 
+        updateDebug('API Error: ' + err.message);
+        // 若 API 錯誤，保守起見顯示表單或錯誤頁，這裡選擇顯示表單讓用戶重試
+        showPage('registerForm');
     }
 }
 
 /* ==========================================
-   📝 註冊動作
+   📝 註冊 (送出後變為待審核)
    ========================================== */
 async function registerUser() {
     const name = $('name').value.trim();
     const phone = $('phone').value.trim();
 
-    // 驗證
-    if (!name || !phone) {
-        alert('請填寫姓名與手機號碼');
-        return;
-    }
-    if (!/^09\d{8}$/.test(phone)) {
-        alert('請輸入正確的 10 碼手機格式');
-        return;
-    }
+    if (!name || !phone) { alert('請填寫完整資料'); return; }
+    if (!/^09\d{8}$/.test(phone)) { alert('請輸入正確手機號碼'); return; }
 
-    // 準備資料
     const payload = {
-        // ✅ 兼容性欄位
-        type: 'register',              
-        mode: 'register',              
-        action: 'register',            
-        
-        spreadsheetId: SPREADSHEET_ID, // 🔹 Google Sheet ID
-        userId: currentUserId,         // 🔹 LINE UserID
-        
-        // 標準欄位
+        type: 'register',
+        mode: 'register',
+        action: 'register',
+        spreadsheetId: SPREADSHEET_ID,
+        userId: currentUserId,
         name: name,
-        displayName: name,             
-        phone: phone,                  
-        role: '待審核',                 
+        displayName: name,
+        phone: phone,
         
-        // 🟢 加入中文欄位 key (防止後端使用中文 key 對應)
+        // 🟢 寫入權限為 "待審核"
+        role: '待審核',
         "姓名": name,
         "電話": phone,
         "權限": "待審核",
         "Line UserID": currentUserId,
         
-        // 🟢 為了通過舊有後端驗證，補上無意義符號
+        // 兼容舊系統的填充欄位
         studentId: '-',
         department: '-',
         
@@ -278,10 +276,7 @@ async function registerUser() {
     setBtnLoading(true);
 
     try {
-        updateDebug('送出註冊資料...');
-        
-        // 🟢 關鍵修正：將 spreadsheetId 也放到 URL 參數中
-        // 這樣就算後端用 e.parameter.spreadsheetId 抓取也能抓得到
+        // 同時在 URL 和 Body 傳送 ID，確保寫入正確工作表
         const postUrl = `${WORKER_URL}?spreadsheetId=${encodeURIComponent(SPREADSHEET_ID)}`;
         
         const response = await fetch(postUrl, {
@@ -291,39 +286,21 @@ async function registerUser() {
         });
 
         const result = await response.json();
-        updateDebug('註冊回應: ' + JSON.stringify(result));
-
+        
         if (result.ok || result.status === 'success' || result.success) {
-            // ✅ 註冊成功後，先彈出視窗讓您確認回應內容 (開發/除錯用)
-            // 確認無誤後，您可以將 JSON.stringify(result) 拿掉
-            alert('✅ 伺服器回應成功！\n\n回應內容：' + JSON.stringify(result) + '\n\n即將跳轉...');
-            
-            $('btnText').textContent = '申請成功';
-            localStorage.setItem('tdea_registered', 'true');
-            
-            setTimeout(() => {
-                window.location.href = NEXT_PAGE;
-            }, 500);
+            alert('✅ 申請成功！\n請通知管理員進行審核。');
+            // 註冊成功後，直接切換到審核中頁面，不要跳轉 main.html
+            $('pendingName').textContent = name;
+            showPage('pendingPage');
         } else {
-            throw new Error(result.message || result.error || '伺服器回傳失敗');
+            throw new Error(result.message || result.error || '無法寫入資料庫');
         }
 
     } catch (err) {
-        console.error('Register Error:', err);
         alert('註冊失敗：' + err.message);
+    } finally {
         setBtnLoading(false);
     }
-}
-
-// 🧪 開發測試用
-if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-    window.addEventListener('load', () => {
-        setTimeout(() => {
-            if(!$('name').value) $('name').value = '測試申請人';
-            $('phone').value = '0912345678';
-            console.log('🧪 開發模式：已自動填寫測試資料');
-        }, 1000);
-    });
 }
 </script>
 </body>
