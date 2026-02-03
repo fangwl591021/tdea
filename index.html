@@ -31,41 +31,46 @@
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
         </svg>
-        <span>驗證權限中...</span>
+        <span>權限驗證中...</span>
       </div>
     </div>
+    <!-- Debug 區域：顯示目前動作 -->
     <div id="debugInfo" class="text-xs text-gray-400 font-mono mt-8 px-4 break-all"></div>
   </div>
 
-  <!-- ⏳ 審核中畫面 (新增) -->
+  <!-- ⏳ 審核中畫面 (新增：顯示目前資料庫讀到的權限) -->
   <div id="pendingPage" class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm text-center hidden fade-in">
     <div class="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
       <i class="fa-solid fa-hourglass-half text-3xl text-yellow-600"></i>
     </div>
     <h2 class="text-2xl font-bold text-gray-800 mb-2">權限審核中</h2>
-    <p class="text-gray-600 mb-6">您的申請已送出，請等待管理員開通後台權限。</p>
-    <div class="bg-gray-50 rounded-lg p-4 text-left text-sm text-gray-500 mb-6">
-      <p><strong>申請人：</strong> <span id="pendingName">-</span></p>
-      <p><strong>狀態：</strong> <span class="text-yellow-600 font-bold">待審核</span></p>
+    <p class="text-gray-600 mb-4">您的申請已送出，請等待管理員開通。</p>
+    
+    <!-- 顯示目前狀態供除錯 -->
+    <div class="bg-gray-50 rounded-lg p-4 text-left text-xs text-gray-500 mb-6 border border-gray-200">
+      <p class="mb-1"><strong>申請人：</strong> <span id="pendingName">-</span></p>
+      <p class="mb-1"><strong>目前權限：</strong> <span id="currentRoleDisplay" class="text-red-500 font-bold">-</span></p>
+      <p class="text-gray-400 mt-2 text-[10px]">若您已是管理員但看到此頁面，請通知工程師檢查資料庫欄位。</p>
     </div>
+
     <button onclick="window.location.reload()" class="w-full bg-gray-200 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-300 transition-all">
-      重新整理狀態
+      <i class="fa-solid fa-rotate-right mr-2"></i>重新整理狀態
     </button>
   </div>
 
-  <!-- ⛔ 無權限畫面 (新增) -->
+  <!-- ⛔ 無權限畫面 -->
   <div id="accessDeniedPage" class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm text-center hidden fade-in">
     <div class="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
       <i class="fa-solid fa-ban text-3xl text-red-600"></i>
     </div>
     <h2 class="text-2xl font-bold text-gray-800 mb-2">無存取權限</h2>
-    <p class="text-gray-600 mb-6">您的帳號已被停用或權限不足。</p>
+    <p class="text-gray-600 mb-6">您的帳號權限不足或已被停用。</p>
     <button onclick="window.close()" class="w-full bg-gray-200 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-300 transition-all">
       關閉頁面
     </button>
   </div>
 
-  <!-- 📝 註冊表單 (未註冊才顯示) -->
+  <!-- 📝 註冊表單 -->
   <div id="registerForm" class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden hidden fade-in">
     <div class="bg-green-500 p-6 text-center text-white relative">
         <h1 class="text-xl font-bold tracking-wide">後台權限申請</h1>
@@ -130,7 +135,11 @@ const SPREADSHEET_ID = '1qJ900hzX1nuN4D2wprXtoknfWOfU8wFrRd4-T3eiGkA';
    ========================================== */
 const $ = id => document.getElementById(id);
 const mask = u => u ? (u.slice(0,8)+'****') : '';
-function updateDebug(msg){ console.log('🔍', msg); } // 開發時可解除註解讓手機顯示: $('debugInfo').innerHTML += `<div>${msg}</div>`;
+function updateDebug(msg){ 
+    console.log('🔍', msg); 
+    // 若要顯示在畫面上除錯，請移除下行註解
+    // $('debugInfo').innerHTML = msg;
+}
 
 function showPage(pageId) {
     ['splash', 'registerForm', 'pendingPage', 'accessDeniedPage'].forEach(id => {
@@ -157,11 +166,14 @@ let currentUserId = null;
 let userProfile = null;
 
 /* ==========================================
-   🚀 初始化流程 (嚴格權限檢查)
+   🚀 初始化流程 (強制清除記憶)
    ========================================== */
 (async function initApp() {
     try {
-        updateDebug('啟動 LIFF 初始化...');
+        // 🛑 強制清除 LocalStorage，防止「記住」舊狀態
+        localStorage.clear();
+        updateDebug('清除快取完成，啟動初始化...');
+
         await liff.init({ liffId: LIFF_ID });
         
         if (!liff.isLoggedIn()) {
@@ -171,75 +183,79 @@ let userProfile = null;
 
         userProfile = await liff.getProfile();
         currentUserId = userProfile.userId;
-        updateDebug('User: ' + userProfile.displayName);
+        updateDebug('Line User: ' + userProfile.displayName);
         
-        // 預填表單資訊
+        // 預填 UI
         $('displayName').textContent = userProfile.displayName;
         if (userProfile.pictureUrl) $('userAvatar').src = userProfile.pictureUrl;
         $('name').value = userProfile.displayName;
 
-        // 🟢 檢查註冊狀態與權限
+        // 🟢 執行嚴格權限檢查
         await checkPermission(currentUserId);
 
     } catch (err) {
         console.error('Error:', err);
-        alert('系統錯誤：' + err.message);
+        alert('系統初始化錯誤：' + err.message);
     }
 })();
 
-// 📡 檢查權限核心邏輯
+// 📡 權限檢查 (嚴格白名單 + 禁用快取)
 async function checkPermission(userId) {
-    updateDebug('檢查權限中...');
+    updateDebug('向伺服器檢查權限中...');
     
     try {
-        const checkUrl = `${WORKER_URL}?mode=check&userId=${encodeURIComponent(userId)}&spreadsheetId=${encodeURIComponent(SPREADSHEET_ID)}`;
+        // 🟢 加上 timestamp 防止 fetch 快取舊資料
+        const timestamp = new Date().getTime();
+        const checkUrl = `${WORKER_URL}?mode=check&userId=${encodeURIComponent(userId)}&spreadsheetId=${encodeURIComponent(SPREADSHEET_ID)}&_t=${timestamp}`;
+        
         const response = await fetch(checkUrl);
         const result = await response.json();
         
-        updateDebug('API 回應: ' + JSON.stringify(result));
+        updateDebug('伺服器回應: ' + JSON.stringify(result));
 
         // 1. 判斷是否註冊
         const isRegistered = (result.data && result.data.registered === true) || (result.registered === true);
         
-        // 2. 取得權限欄位 (假設後端回傳的物件中有 role 或 data.role 或 data['權限'])
+        // 2. 嚴格提取權限
         let role = '';
         const userData = result.data || result.user || {};
         
         if (userData.role) role = userData.role;
-        else if (userData['權限']) role = userData['權限']; // 兼容中文欄位
+        else if (userData['權限']) role = userData['權限'];
         
-        updateDebug(`狀態: ${isRegistered ? '已註冊' : '未註冊'}, 權限: ${role}`);
+        // 如果權限是 undefined 或 null，設為空字串，避免錯誤
+        if (!role) role = '無';
+
+        updateDebug(`判定結果 -> 註冊:${isRegistered}, 權限:${role}`);
 
         if (isRegistered) {
-            // ✅ 已註冊，進行權限分流
+            // ✅ 只有「管理員」才能進入
             if (role === '管理員' || role === 'Admin') {
-                updateDebug('✅ 權限通過，進入後台');
-                setTimeout(() => window.location.replace(NEXT_PAGE), 800);
-            } 
-            else if (role === '待審核' || role === 'pending') {
-                updateDebug('⏳ 待審核');
-                $('pendingName').textContent = userData.name || userData.displayName || userProfile.displayName;
-                showPage('pendingPage');
+                updateDebug('✅ 驗證通過');
+                setTimeout(() => window.location.replace(NEXT_PAGE), 500);
             } 
             else {
-                updateDebug('⛔ 無權限');
-                showPage('accessDeniedPage');
+                // 🛑 其他所有情況 (待審核、被拒絕、空值) 都擋下
+                updateDebug('⏳ 權限不足，顯示審核頁');
+                $('pendingName').textContent = userData.name || userData.displayName || userProfile.displayName;
+                $('currentRoleDisplay').textContent = role; // 顯示目前抓到的權限，方便除錯
+                showPage('pendingPage');
             }
         } else {
             // 📝 未註冊 -> 顯示表單
-            updateDebug('未註冊，顯示表單');
+            updateDebug('未註冊，顯示註冊表單');
             showPage('registerForm');
         }
 
     } catch (err) {
-        updateDebug('API Error: ' + err.message);
-        // 若 API 錯誤，保守起見顯示表單或錯誤頁，這裡選擇顯示表單讓用戶重試
+        updateDebug('檢查失敗: ' + err.message);
+        // 如果連線失敗，保守起見顯示表單，不要放行
         showPage('registerForm');
     }
 }
 
 /* ==========================================
-   📝 註冊 (送出後變為待審核)
+   📝 註冊 (送出後僅顯示等待畫面)
    ========================================== */
 async function registerUser() {
     const name = $('name').value.trim();
@@ -265,10 +281,8 @@ async function registerUser() {
         "權限": "待審核",
         "Line UserID": currentUserId,
         
-        // 兼容舊系統的填充欄位
         studentId: '-',
         department: '-',
-        
         pictureUrl: userProfile?.pictureUrl || '',
         timestamp: new Date().toISOString()
     };
@@ -276,8 +290,9 @@ async function registerUser() {
     setBtnLoading(true);
 
     try {
-        // 同時在 URL 和 Body 傳送 ID，確保寫入正確工作表
-        const postUrl = `${WORKER_URL}?spreadsheetId=${encodeURIComponent(SPREADSHEET_ID)}`;
+        // 同樣加上 timestamp 防止快取
+        const timestamp = new Date().getTime();
+        const postUrl = `${WORKER_URL}?spreadsheetId=${encodeURIComponent(SPREADSHEET_ID)}&_t=${timestamp}`;
         
         const response = await fetch(postUrl, {
             method: 'POST',
@@ -288,10 +303,14 @@ async function registerUser() {
         const result = await response.json();
         
         if (result.ok || result.status === 'success' || result.success) {
-            alert('✅ 申請成功！\n請通知管理員進行審核。');
-            // 註冊成功後，直接切換到審核中頁面，不要跳轉 main.html
+            alert('✅ 申請已送出！\n\n系統將跳轉至狀態頁面，請等待管理員核准權限。');
+            
+            // 🟢 更新狀態頁資訊，並顯示
             $('pendingName').textContent = name;
+            $('currentRoleDisplay').textContent = '待審核 (剛提交)';
             showPage('pendingPage');
+            
+            // 🛑 絕對不要在這裡跳轉 main.html
         } else {
             throw new Error(result.message || result.error || '無法寫入資料庫');
         }
