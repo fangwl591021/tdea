@@ -18,7 +18,7 @@
 </head>
 <body class="bg-gray-50 min-h-screen flex items-center justify-center p-4 font-sans text-gray-700">
 
-  <!-- 🟢 Loading / Splash 畫面 -->
+  <!-- 🟢 Loading / 驗證中畫面 (Splash) -->
   <div id="splash" class="flex flex-col items-center justify-center w-full max-w-sm mx-auto text-center space-y-6 fade-in">
     <div class="relative w-24 h-24 bg-white rounded-2xl shadow-lg flex items-center justify-center mb-4">
       <i class="fa-solid fa-shield-halved text-4xl text-green-500"></i>
@@ -41,12 +41,12 @@
       <i class="fa-solid fa-hourglass-half text-3xl text-yellow-600"></i>
     </div>
     <h2 class="text-2xl font-bold text-gray-800 mb-2">權限審核中</h2>
-    <p class="text-gray-600 mb-4">您的申請已送出，請等待管理員開通。</p>
+    <p class="text-gray-600 mb-4">您的申請已送出，請等待管理員核准開通權限。</p>
     
     <div class="bg-gray-50 rounded-lg p-4 text-left text-xs text-gray-500 mb-6 border border-gray-200">
       <p class="mb-1"><strong>申請人：</strong> <span id="pendingName">-</span></p>
       <p class="mb-1"><strong>目前狀態：</strong> <span class="text-orange-500 font-bold">待審核</span></p>
-      <p class="text-gray-400 mt-2 text-[10px]">管理員核准後，重新整理即可進入系統。</p>
+      <p class="text-gray-400 mt-2 text-[10px]">管理員將狀態更改為「核准」或「管理員」後，點擊下方重新整理即可進入。</p>
     </div>
 
     <button onclick="window.location.reload()" class="w-full bg-gray-200 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-300 transition-all">
@@ -69,9 +69,6 @@
     <div class="pt-12 pb-8 px-6 space-y-4">
       <div class="text-center mb-4">
         <p id="displayName" class="font-bold text-gray-800 text-lg">載入中...</p>
-        <div class="mt-2 p-2 bg-blue-50 text-blue-700 text-xs rounded-lg border border-blue-100">
-          <i class="fa-solid fa-circle-info mr-1"></i> 提交後需人工核准才能登入
-        </div>
       </div>
 
       <div class="space-y-1">
@@ -80,7 +77,7 @@
             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <i class="fa-regular fa-user text-gray-400"></i>
             </div>
-            <input id="name" type="text" placeholder="請輸入您的姓名" 
+            <input id="name" type="text" placeholder="請輸入您的真實姓名" 
                 class="input-field w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50 outline-none transition-all text-gray-700 placeholder-gray-400">
         </div>
       </div>
@@ -107,7 +104,7 @@
 
 <script>
 /* ==========================================
-   ⚙️ 系統設定 (請填寫您的 GAS URL)
+   ⚙️ 系統設定
    ========================================== */
 const LIFF_ID  = '2005868456-cfANNVou';     
 const GAS_URL  = 'https://script.google.com/macros/s/AKfycbzY-CJEeIEJob3SJ_XNKV1u-Rv5JdaN56vpZq1o0e9OeUb88hqnEYWaC0FUa6CnudC4/exec'; 
@@ -137,7 +134,7 @@ window.onload = async function() {
         const profile = await liff.getProfile();
         currentUserId = profile.userId;
         
-        // 預填 UI 資訊
+        // 預填介面資訊
         $('displayName').textContent = profile.displayName;
         if (profile.pictureUrl) $('userAvatar').src = profile.pictureUrl;
         $('name').value = profile.displayName;
@@ -146,44 +143,57 @@ window.onload = async function() {
         await checkPermission(currentUserId);
 
     } catch (err) {
-        console.error(err);
+        console.error('LIFF Init Error:', err);
         alert('系統初始化錯誤：' + err.message);
     }
 };
 
+/**
+ * 核心權限檢查函式 (含防快取機制)
+ */
 async function checkPermission(userId) {
     try {
-        const response = await fetch(GAS_URL, {
+        // 🌟 加入時間戳記避免 fetch 抓到舊的快取結果
+        const nocacheUrl = GAS_URL + '?t=' + new Date().getTime();
+        
+        const response = await fetch(nocacheUrl, {
             method: 'POST',
+            mode: 'cors',
             body: JSON.stringify({ action: 'check', userId: userId })
         });
         const result = await response.json();
 
+        console.log("權限驗證回傳：", result);
+
         if (result.status === 'ok') {
-            // ✅ 管理員/操作人員 -> 跳轉
+            // ✅ 通過：跳轉至管理主頁
             window.location.replace(NEXT_PAGE);
         } 
         else if (result.status === 'pending') {
-            // ⏳ 待審核 -> 顯示等待頁
+            // ⏳ 待審核：顯示等待頁面
             $('pendingName').textContent = result.name || "申請人";
             showPage('pendingPage');
         } 
         else {
-            // 📝 未註冊 (status: 'new') -> 顯示表單
+            // 📝 新使用者：顯示註冊表單
             showPage('registerForm');
         }
     } catch (err) {
         console.error('Check Failed:', err);
-        showPage('registerForm'); // 失敗時預設顯示表單
+        // 若發生連線錯誤，保守起見顯示表單
+        showPage('registerForm');
     }
 }
 
+/**
+ * 提交註冊申請
+ */
 async function registerUser() {
     const name = $('name').value.trim();
     const phone = $('phone').value.trim();
 
-    if (!name || !phone) { alert('請填寫完整資料'); return; }
-    if (!/^09\d{8}$/.test(phone)) { alert('請輸入正確手機號碼'); return; }
+    if (!name || !phone) { alert('請填寫完整姓名與電話'); return; }
+    if (!/^09\d{8}$/.test(phone)) { alert('請輸入正確的手機號碼格式'); return; }
 
     const btn = $('registerBtn');
     btn.disabled = true;
@@ -193,6 +203,7 @@ async function registerUser() {
     try {
         const response = await fetch(GAS_URL, {
             method: 'POST',
+            mode: 'cors',
             body: JSON.stringify({
                 action: 'register',
                 userId: currentUserId,
@@ -204,21 +215,24 @@ async function registerUser() {
         const result = await response.json();
         
         if (result.success) {
-            alert('✅ 申請已送出，請等待管理員核准！');
+            alert('✅ 申請已送出！請聯繫管理員核准權限。');
             $('pendingName').textContent = name;
             showPage('pendingPage');
         } else {
             alert('註冊失敗：' + result.message);
-            btn.disabled = false;
-            $('btnText').classList.remove('hidden');
-            $('btnSpinner').classList.add('hidden');
+            resetBtn();
         }
     } catch (err) {
-        alert('連線失敗，請稍後再試');
-        btn.disabled = false;
-        $('btnText').classList.remove('hidden');
-        $('btnSpinner').classList.add('hidden');
+        alert('連線失敗，請檢查 GAS 部署權限是否正確。');
+        resetBtn();
     }
+}
+
+function resetBtn() {
+    const btn = $('registerBtn');
+    btn.disabled = false;
+    $('btnText').classList.remove('hidden');
+    $('btnSpinner').classList.add('hidden');
 }
 </script>
 </body>
