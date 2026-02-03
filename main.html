@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TDEA 管理中心</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- LINE LIFF SDK -->
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+    <style>
+        body { background-color: #f3f4f6; font-family: "Microsoft JhengHei", sans-serif; }
+        .sidebar-bg { background-color: #2d333b; }
+        .active-item { background-color: #243b32; border-left: 4px solid #4ade80; color: #4ade80; }
+        .menu-item:hover:not(.active-item) { background-color: #3d444d; }
+        table th { text-align: center !important; white-space: nowrap; font-size: 13px; }
+        table td { text-align: center !important; white-space: nowrap; font-size: 13px; padding: 12px 8px; }
+        .table-container { background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); overflow-x: auto; }
+        .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 40; display: none; }
+        .drawer-overlay.open { display: block; }
+        .drawer { position: fixed; top: 0; right: 0; height: 100%; width: 500px; background: white; z-index: 50; transition: transform 0.3s ease-in-out; transform: translateX(100%); box-shadow: -10px 0 30px rgba(0,0,0,0.1); }
+        .drawer.open { transform: translateX(0); }
+        
+        .fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <?!= include('Creation Form'); ?>
+
+    <script type="text/babel">
+        const { useState, useEffect, useContext, createContext } = React;
+        const LIFF_ID = "2008786875-IF9Isv7E"; 
+        const UserContext = createContext(null);
+
+        // Icon SVG 組件
+        const IconBase = ({ size = 24, className, children }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>);
+        const BarChart2 = ({ size, className }) => (<IconBase size={size} className={className}><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></IconBase>);
+        const Users = ({ size, className }) => (<IconBase size={size} className={className}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></IconBase>);
+        const FileText = ({ size, className }) => (<IconBase size={size} className={className}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></IconBase>);
+        const Activity = ({ size, className }) => (<IconBase size={size} className={className}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></IconBase>);
+        const LogOut = ({ size, className }) => (<IconBase size={size} className={className}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></IconBase>);
+        const Trash = ({ size, className }) => (<IconBase size={size} className={className}><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></IconBase>);
+
+        const AuthGuard = ({ children }) => {
+            const [status, setStatus] = useState("LOADING"); // LOADING, LOGIN_REQUIRED, REGISTER, PENDING, AUTHORIZED, ERROR
+            const [userProfile, setUserProfile] = useState(null);
+            const [debugInfo, setDebugInfo] = useState("初始化中...");
+            
+            // 註冊表單狀態
+            const [regForm, setRegForm] = useState({ name: '', phone: '' });
+            const [regLoading, setRegLoading] = useState(false);
+
+            useEffect(() => {
+                const initLiff = async () => {
+                    try {
+                        setDebugInfo("連接 LINE LIFF...");
+                        await liff.init({ liffId: LIFF_ID });
+                        if (!liff.isLoggedIn()) {
+                            setStatus("LOGIN_REQUIRED");
+                        } else {
+                            const profile = await liff.getProfile();
+                            setUserProfile(profile);
+                            // 自動帶入姓名到註冊表單
+                            setRegForm(prev => ({ ...prev, name: profile.displayName }));
+                            checkPermission(profile.userId);
+                        }
+                    } catch (err) {
+                        setStatus("ERROR");
+                        setDebugInfo("LIFF Error: " + err.message);
+                    }
+                };
+                initLiff();
+            }, []);
+
+            const checkPermission = (uid) => {
+                setDebugInfo("驗證權限...");
+                if (typeof google !== 'undefined') {
+                    google.script.run
+                        .withSuccessHandler((res) => {
+                            if (res.status === 'ok') setStatus("AUTHORIZED");
+                            else if (res.status === 'new') setStatus("REGISTER");
+                            else setStatus("PENDING");
+                        })
+                        .withFailureHandler((err) => {
+                            setStatus("ERROR");
+                            setDebugInfo("後端失敗: " + err.message);
+                        })
+                        .checkUserPermission(uid);
+                } else {
+                    // 本地測試 (手動切換)
+                    setStatus("REGISTER"); 
+                    setUserProfile({ userId: 'U_TEST', displayName: '測試員' });
+                }
+            };
+
+            const handleLogin = () => {
+                // 強制跳轉到頂層
+                window.top.location.href = `https://liff.line.me/${LIFF_ID}`;
+            };
+
+            const handleRegister = () => {
+                if (!regForm.name || !regForm.phone) { alert("請填寫完整"); return; }
+                setRegLoading(true);
+                google.script.run.withSuccessHandler((res) => {
+                    setRegLoading(false);
+                    if (res.success) {
+                        setStatus("PENDING");
+                    } else {
+                        alert("註冊失敗: " + res.message);
+                    }
+                }).registerAdminUser({ uid: userProfile.userId, name: regForm.name, phone: regForm.phone });
+            };
+
+            const handleLogout = () => {
+                if (liff.isLoggedIn()) {
+                    liff.logout();
+                    window.location.reload();
+                }
+            };
+
+            const handleResetAccount = () => {
+                if (!confirm("⚠️ 確定重置？")) return;
+                google.script.run.withSuccessHandler(() => {
+                    liff.logout();
+                    window.location.reload();
+                }).deleteMyData(userProfile?.userId);
+            };
+
+            // --- 狀態渲染 ---
+
+            if (status === "LOADING") return (
+                <div className="h-screen flex flex-col items-center justify-center bg-gray-50">
+                    <div className="w-12 h-12 border-4 border-green-200 border-t-green-500 rounded-full animate-spin mb-4"></div>
+                    <p className="text-gray-500 font-bold">系統載入中...</p>
+                </div>
+            );
+
+            if (status === "LOGIN_REQUIRED") return (
+                <div className="h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-blue-50 p-6 fade-in">
+                    <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm text-center">
+                        <div className="mb-6"><img src="https://upload.wikimedia.org/wikipedia/commons/4/41/LINE_logo.svg" className="w-20 h-20 mx-auto" /></div>
+                        <h2 className="text-2xl font-black text-gray-800 mb-2">TDEA 管理中心</h2>
+                        <p className="text-gray-500 mb-8">請登入 LINE 帳號以驗證身分</p>
+                        <button onClick={handleLogin} className="w-full bg-[#06c755] hover:bg-[#05b34c] text-white py-3 rounded-xl font-bold shadow-lg transition-all active:scale-95 text-lg">
+                            LINE 登入
+                        </button>
+                    </div>
+                </div>
+            );
+
+            if (status === "REGISTER") return (
+                <div className="h-screen flex items-center justify-center bg-gray-50 p-6 fade-in">
+                    <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm">
+                        <div className="text-center mb-8">
+                            <h2 className="text-2xl font-black text-gray-800">歡迎加入 TDEA</h2>
+                            <p className="text-gray-500 text-sm mt-1">初次使用請填寫基本資料</p>
+                        </div>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">您的姓名</label>
+                                <input className="w-full border p-3 rounded-xl outline-none focus:ring-2 focus:ring-green-500 bg-gray-50 font-bold text-gray-900" 
+                                       value={regForm.name} onChange={e => setRegForm({...regForm, name: e.target.value})} />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">聯絡電話</label>
+                                <input className="w-full border p-3 rounded-xl outline-none focus:ring-2 focus:ring-green-500 bg-gray-50 font-bold text-gray-900" 
+                                       placeholder="09xx-xxx-xxx" value={regForm.phone} onChange={e => setRegForm({...regForm, phone: e.target.value})} />
+                            </div>
+                            <button onClick={handleRegister} disabled={regLoading} className="w-full bg-[#4ade80] hover:bg-green-500 text-white py-3 rounded-xl font-bold shadow-lg transition-all active:scale-95 disabled:opacity-50 mt-4">
+                                {regLoading ? "註冊中..." : "送出申請"}
+                            </button>
+                            <div className="text-center text-xs text-gray-400 mt-4 font-mono">UID: {userProfile?.userId.slice(0, 10)}...</div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            if (status === "PENDING") return (
+                <div className="h-screen flex items-center justify-center bg-gray-50 p-6 fade-in text-center">
+                    <div className="bg-white p-10 rounded-2xl shadow-xl max-w-sm">
+                        <div className="text-6xl mb-4">⏳</div>
+                        <h2 className="text-2xl font-bold text-gray-800 mb-2">權限審核中</h2>
+                        <p className="text-gray-600 mb-6">您的註冊資料已送出。<br/>請聯繫管理員開通權限。</p>
+                        <button onClick={() => window.location.reload()} className="text-blue-500 font-bold underline">已開通？點此刷新</button>
+                        <div className="mt-4 border-t pt-4"><button onClick={handleLogout} className="text-xs text-red-400 hover:text-red-600">登出</button></div>
+                    </div>
+                </div>
+            );
+
+            if (status === "ERROR") return <div className="p-10 text-center text-red-500 font-bold">{debugInfo}</div>;
+
+            // 授權通過：顯示主畫面
+            return (
+                <UserContext.Provider value={{...userProfile, logout: handleLogout, reset: handleResetAccount}}>
+                    {children}
+                </UserContext.Provider>
+            );
+        };
+        
+        // ... (Dashboard, EditDrawer, MemberTable, App 組件保持 v8.2.1 不變) ...
+        // (省略以節省篇幅，請保留原有的 React 組件內容)
+        const Dashboard = () => { const [stats, setStats] = useState({ activityCount: 0, assocCount: 0, vendorCount: 0 }); const [recentList, setRecentList] = useState([]); const [loading, setLoading] = useState(true); useEffect(() => { if (typeof google !== 'undefined') { google.script.run.withSuccessHandler(res => { if (res.success) { setStats(res.stats); setRecentList(res.recentActivities || []); } setLoading(false); }).getDashboardSummary(); } else { setTimeout(() => { setStats({ activityCount: 5, assocCount: 120, vendorCount: 30 }); setRecentList([{ '活動名稱': '測試活動', '報名人數': 10, '核銷人數': 2, '狀態': '上架' }]); setLoading(false); }, 500); } }, []); return ( <div className="p-8"> <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2"><BarChart2 className="w-6 h-6 text-green-600" size={24} /> 系統儀表板</h2> <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"> <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between"><div><p className="text-gray-500 text-sm font-bold mb-1">上架活動</p><h3 className="text-3xl font-black text-green-600">{loading ? '...' : stats.activityCount}</h3></div><div className="bg-green-50 p-3 rounded-full text-green-600"><Activity className="w-6 h-6" /></div></div> <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between"><div><p className="text-gray-500 text-sm font-bold mb-1">協會會員</p><h3 className="text-3xl font-black text-blue-600">{loading ? '...' : stats.assocCount}</h3></div><div className="bg-blue-50 p-3 rounded-full text-blue-600"><Users className="w-6 h-6" /></div></div> <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between"><div><p className="text-gray-500 text-sm font-bold mb-1">贊助廠商</p><h3 className="text-3xl font-black text-purple-600">{loading ? '...' : stats.vendorCount}</h3></div><div className="bg-purple-50 p-3 rounded-full text-purple-600"><FileText className="w-6 h-6" /></div></div> </div> <h3 className="text-lg font-bold text-gray-700 mb-4">🔥 近期熱門活動</h3> <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"><table className="w-full text-sm text-left"><thead className="bg-gray-50 text-gray-500 font-bold border-b"><tr><th className="p-4">活動名稱</th><th className="p-4 text-center">狀態</th><th className="p-4 text-center">報名</th><th className="p-4 text-center">核銷</th></tr></thead><tbody className="divide-y divide-gray-100">{loading ? <tr><td colSpan="4" className="p-8 text-center text-gray-400">數據載入中...</td></tr> : recentList.length === 0 ? <tr><td colSpan="4" className="p-8 text-center text-gray-400 italic">無近期活動</td></tr> : recentList.map((act, idx) => (<tr key={idx} className="hover:bg-gray-50"><td className="p-4 font-bold text-gray-800">{act['活動名稱']}</td><td className="p-4 text-center"><span className="bg-green-100 text-green-700 py-1 px-2 rounded text-xs font-bold">{act['狀態']}</span></td><td className="p-4 text-center font-bold text-blue-600">{act['報名人數']}</td><td className="p-4 text-center text-gray-500">{act['核銷人數']}</td></tr>))}</tbody></table></div> </div> ); };
+        const EditDrawer = ({ isOpen, onClose, item, sheetName, onSaved }) => { const [formData, setFormData] = useState({}); const [isSaving, setIsSaving] = useState(false); useEffect(() => { if (item) setFormData(item); }, [item]); const handleSave = () => { setIsSaving(true); google.script.run.withSuccessHandler(() => { setIsSaving(false); onSaved(); onClose(); }).updateMemberData(sheetName, formData._row, formData); }; if (!item) return null; return (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" style={{ display: isOpen ? 'flex' : 'none' }}><div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[90vh] p-6"><h3 className="text-xl font-bold mb-4">✏️ 編輯資料</h3><div className="flex-1 overflow-y-auto space-y-4">{Object.keys(formData).filter(k => !k.startsWith('_')).map(k => (<div key={k}><label className="text-xs font-bold text-gray-400 uppercase">{k}</label><input className="w-full border p-2 rounded mt-1 outline-none focus:ring-2 focus:ring-green-400" value={formData[k] || ""} onChange={e => setFormData({...formData, [k]: e.target.value})} /></div>))}</div><div className="pt-6 flex gap-2"><button onClick={handleSave} className="flex-1 bg-[#4ade80] text-white py-3 rounded-lg font-bold shadow-md hover:bg-green-600 transition-all">{isSaving ? "儲存中..." : "確認儲存"}</button><button onClick={onClose} className="flex-1 bg-gray-100 py-3 rounded-lg">取消</button></div></div></div>); };
+        const MemberTable = ({ title, sheetName }) => { const [data, setData] = useState([]); const [loading, setLoading] = useState(true); const [searchTerm, setSearchTerm] = useState(""); const [editingItem, setEditingItem] = useState(null); const fetchData = () => { setLoading(true); if (typeof google !== 'undefined') { google.script.run.withSuccessHandler(res => { setData(res || []); setLoading(false); }).getMemberData(sheetName); } }; useEffect(() => { fetchData(); }, [sheetName]); const filteredData = data.filter(item => Object.values(item).some(val => String(val).toLowerCase().includes(searchTerm.toLowerCase()))); const gv = (item, keys) => { const foundKey = Object.keys(item).find(k => keys.some(target => k.includes(target))); return foundKey ? item[foundKey] : ""; }; return (<div className="p-6"><EditDrawer isOpen={!!editingItem} onClose={() => setEditingItem(null)} item={editingItem} sheetName={sheetName} onSaved={fetchData} /><div className="flex justify-between items-center mb-6"><div><h2 className="text-2xl font-bold text-gray-800">{title}</h2><p className="text-sm text-gray-400">目前顯示 {filteredData.length} 筆資料</p></div><div className="flex gap-2"><input className="pl-4 pr-10 py-2 border rounded-xl w-64 shadow-sm outline-none focus:ring-2 focus:ring-green-400" placeholder="🔍 搜尋..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /><button onClick={fetchData} className="bg-white border px-4 py-2 rounded-xl shadow-sm hover:bg-gray-50">🔄 刷新</button></div></div><div className="bg-white rounded-xl shadow-sm border overflow-auto"><table className="w-full text-sm"><thead><tr className="bg-gray-50 border-b"><th className="p-4 border-r">編號</th>{sheetName.includes("本業") ? <React.Fragment><th className="p-4 border-r">身分</th><th className="p-4 border-r">姓名</th></React.Fragment> : <React.Fragment><th className="p-4 border-r">公司名稱</th><th className="p-4 border-r">統編</th><th className="p-4 border-r">負責人</th></React.Fragment>}<th className="p-4 border-r">資格</th><th className="p-4 border-r bg-blue-50">報名</th><th className="p-4 border-r">講座</th><th className="p-4 border-r">教學</th><th className="p-4 border-r">聯誼</th><th className="p-4 sticky right-0 bg-gray-50 border-l">操作</th></tr></thead><tbody>{loading ? <tr><td colSpan="11" className="p-10 text-gray-400">讀取中...</td></tr> : filteredData.map((item, idx) => (<tr key={idx} className="hover:bg-gray-50"><td className="p-4 border-r font-mono text-blue-600 font-bold">{gv(item, ["會員編號", "編號"])}</td>{sheetName.includes("本業") ? <React.Fragment><td className="p-4 border-r">{gv(item, ["身分"])}</td><td className="p-4 border-r font-bold">{gv(item, ["姓名"])}</td></React.Fragment> : <React.Fragment><td className="p-4 border-r font-bold">{gv(item, ["公司", "廠商"])}</td><td className="p-4 border-r font-mono">{gv(item, ["統編"])}</td><td className="p-4 border-r">{gv(item, ["負責人"])}</td></React.Fragment>}<td className="p-4 border-r text-center">{gv(item, ["資格"]) || "N"}</td><td className="p-4 border-r font-bold text-blue-600 bg-blue-50/20 text-center">{gv(item, ["報名次數"]) || 0}</td><td className="p-4 border-r text-center">{gv(item, ["講座"]) || 0}</td><td className="p-4 border-r text-center">{gv(item, ["教學"]) || 0}</td><td className="p-4 border-r text-center">{gv(item, ["聯誼"]) || 0}</td><td className="p-4 sticky right-0 bg-white border-l text-center"><button onClick={() => setEditingItem(item)} className="bg-green-500 text-white px-3 py-1 rounded text-xs">編輯</button></td></tr>))}</tbody></table></div></div>);
+        };
+
+        const App = () => {
+            const [view, setView] = useState('dashboard');
+            const [ActivityView, setActivityView] = useState(null);
+            const [isMemberMenuOpen, setIsMemberMenuOpen] = useState(true);
+            const user = useContext(UserContext); // 從 AuthGuard 取得 user
+
+            useEffect(() => {
+                const checkModule = () => { if (window.ActivityManagementModule) setActivityView(() => window.ActivityManagementModule); else setTimeout(checkModule, 100); };
+                checkModule();
+            }, [view]);
+
+            const handleLogout = () => { if (confirm("確定要登出嗎？")) { liff.logout(); window.location.reload(); } };
+            const handleResetAccount = () => {
+                if (!confirm("⚠️ 警告：這將刪除您在管理名冊中的資料。\n確定要執行嗎？")) return;
+                google.script.run.withSuccessHandler((res) => {
+                    if (res.success) { alert("已重置，將重新整理..."); liff.logout(); window.location.reload(); } 
+                    else { alert("重置失敗: " + res.message); }
+                }).deleteMyData(user.userId);
+            };
+
+            return (
+                <AuthGuard>
+                    <div className="flex h-screen overflow-hidden text-gray-700">
+                        <div className="w-64 sidebar-bg text-gray-300 flex flex-col shrink-0 shadow-2xl">
+                            <div className="p-8 border-b border-gray-700 text-[#4ade80] text-2xl font-bold text-center italic tracking-widest">TDEA Hub</div>
+                            <nav className="flex-1 mt-6">
+                                <div className={`px-6 py-4 cursor-pointer flex items-center gap-3 ${view === 'dashboard' ? 'active-item' : 'menu-item'}`} onClick={() => setView('dashboard')}><BarChart2 size={20} /><span>系統總覽</span></div>
+                                <div className={`px-6 py-4 cursor-pointer flex items-center gap-3 ${view === 'activity' ? 'active-item' : 'menu-item'}`} onClick={() => setView('activity')}><Activity size={20} /><span>活動管理控制台</span></div>
+                                <div onClick={() => setIsMemberMenuOpen(!isMemberMenuOpen)} className="px-6 py-4 cursor-pointer flex justify-between items-center menu-item"><div className="flex items-center gap-3"><Users size={20} /><span>會員資料管理</span></div><span>{isMemberMenuOpen ? '▼' : '▶'}</span></div>
+                                {isMemberMenuOpen && <div className="bg-[#22272e]"><div className={`pl-14 py-3 cursor-pointer text-sm ${view === 'assoc' ? 'active-item' : 'menu-item'}`} onClick={() => setView('assoc')}>協會名冊</div><div className={`pl-14 py-3 cursor-pointer text-sm ${view === 'vendor' ? 'active-item' : 'menu-item'}`} onClick={() => setView('vendor')}>廠商名冊</div></div>}
+                            </nav>
+                            {user && (<div className="border-t border-gray-700 bg-[#22272e] p-4"><div className="flex items-center gap-3 mb-3"><img src={user.pictureUrl || "https://ui-avatars.com/api/?name="+user.displayName} className="w-10 h-10 rounded-full border border-gray-500" /><div className="overflow-hidden"><div className="text-white font-bold text-sm truncate">{user.displayName}</div><div className="text-[10px] text-green-400">已連線</div></div></div><div className="flex gap-2"><button onClick={handleLogout} className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-1.5 rounded text-xs flex items-center justify-center gap-1 transition-all"><LogOut size={12}/> 登出</button><button onClick={handleResetAccount} className="flex-1 bg-red-900/50 hover:bg-red-800 text-red-300 py-1.5 rounded text-xs flex items-center justify-center gap-1 transition-all"><Trash size={12}/> 重置</button></div></div>)}
+                        </div>
+                        <div className="flex-1 flex flex-col bg-[#f8fafc] overflow-hidden">
+                            <header className="h-16 bg-white border-b px-8 flex items-center justify-between shadow-sm shrink-0">
+                                <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-green-400"></span><div className="text-sm font-bold text-gray-500">位置：{view === 'dashboard' ? '總覽' : view === 'activity' ? '活動管理' : '名冊查詢'}</div></div>
+                                <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white font-bold">T</div>
+                            </header>
+                            <main className="flex-1 overflow-auto">
+                                {view === 'dashboard' && <Dashboard />}
+                                {view === 'activity' && (ActivityView ? <ActivityView /> : <div className="p-20 text-center">載入中...</div>)}
+                                {view === 'assoc' && <MemberTable title="協會會員名冊" sheetName="本業會員" />}
+                                {view === 'vendor' && <MemberTable title="廠商贊助名冊" sheetName="廠商會員" />}
+                            </main>
+                        </div>
+                    </div>
+                </AuthGuard>
+            );
+        };
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
