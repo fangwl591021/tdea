@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>TDEA 活動管理系統 - 管理員註冊</title>
+  <title>TDEA 活動管理系統 - 用戶註冊</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- 引入 FontAwesome 圖標 -->
@@ -46,8 +46,8 @@
   <div id="registerForm" class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden hidden fade-in">
     <!-- 表單頭部 -->
     <div class="bg-green-500 p-6 text-center text-white relative">
-        <h1 class="text-xl font-bold tracking-wide">管理員資料註冊</h1>
-        <p class="text-green-100 text-sm mt-1">請確認您的基本資料</p>
+        <h1 class="text-xl font-bold tracking-wide">後台權限申請</h1>
+        <p class="text-green-100 text-sm mt-1">請填寫真實資料以供審核</p>
         
         <!-- 大頭貼顯示區 -->
         <div class="absolute -bottom-8 left-1/2 transform -translate-x-1/2">
@@ -64,7 +64,9 @@
       <div class="text-center mb-4">
         <p id="displayName" class="font-bold text-gray-800 text-lg">載入中...</p>
         <p id="userIdDisplay" class="text-xs text-gray-400 font-mono"></p>
-        <span class="inline-block mt-1 px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded-full">申請權限：管理員</span>
+        <div class="mt-2 p-2 bg-blue-50 text-blue-700 text-xs rounded-lg border border-blue-100">
+          <i class="fa-solid fa-circle-info mr-1"></i> 註冊後需等待管理員核准權限
+        </div>
       </div>
 
       <!-- 姓名欄位 -->
@@ -94,13 +96,13 @@
       <!-- 按鈕區域 -->
       <div class="pt-4">
         <button id="registerBtn" onclick="registerUser()" class="btn-line w-full text-white py-3.5 rounded-xl font-bold text-lg shadow-lg shadow-green-200 transition-all flex items-center justify-center space-x-2">
-            <span id="btnText">確認註冊</span>
+            <span id="btnText">提交申請</span>
             <div id="btnSpinner" class="hidden animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
         </button>
       </div>
       
       <p class="text-center text-xs text-gray-400 mt-4">
-        點擊註冊即表示您同意本系統的使用條款
+        提交即表示您同意本系統的使用規範
       </p>
     </div>
   </div>
@@ -195,19 +197,23 @@ let userProfile = null;
 async function checkRegistrationStatus(userId) {
     updateDebug('正在檢查註冊狀態...');
     try {
-        // 帶上 spreadsheetId 參數 (如果後端有支援多表切換)
+        // 帶上 spreadsheetId 參數
         const checkUrl = `${WORKER_URL}?mode=check&userId=${encodeURIComponent(userId)}&spreadsheetId=${encodeURIComponent(SPREADSHEET_ID)}`;
         const response = await fetch(checkUrl);
         
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const result = await response.json();
         
+        // 判斷是否已註冊
         const isRegistered = (result.data && result.data.registered === true) || 
                              (result.registered === true);
 
         if (isRegistered) {
             updateDebug('✅ 已註冊，跳轉中...');
             localStorage.setItem('tdea_user', JSON.stringify(result.data || result.user));
+            
+            // 可以在這裡判斷 role，如果 role 還是 "待審核"，可以導向一個 "審核中" 頁面，而不是 main.html
+            // 但依目前需求，先直接導向後台入口
             setTimeout(() => {
                 window.location.replace(NEXT_PAGE);
             }, 1000);
@@ -242,17 +248,24 @@ async function registerUser() {
 
     // 準備資料
     const payload = {
-        // ✅ 關鍵修改：同時發送 type, mode, action 滿足不同後端寫法
+        // ✅ 兼容性欄位
         type: 'register',              
         mode: 'register',              
         action: 'register',            
         
         spreadsheetId: SPREADSHEET_ID, // 🔹 Google Sheet ID
         userId: currentUserId,         // 🔹 LINE UserID
-        name: name,                    // ✅ 增加 name 欄位 (許多後端使用 name 而非 displayName)
-        displayName: name,             // 保留 displayName
+        name: name,                    // 🔹 姓名
+        displayName: name,             
         phone: phone,                  // 🔹 電話
-        role: '管理員',                 // 🔹 權限 (預設寫入管理員)
+        
+        // 🔹 權限設定：設為 "待審核"，等待後台人工核准
+        role: '待審核',                 
+        
+        // 🟢 為了通過舊有後端驗證，補上無意義符號，避免 "缺少必要欄位" 錯誤
+        studentId: '-',
+        department: '-',
+        
         pictureUrl: userProfile?.pictureUrl || '',
         timestamp: new Date().toISOString()
     };
@@ -261,7 +274,6 @@ async function registerUser() {
 
     try {
         updateDebug('送出註冊資料...');
-        console.log('Payload:', payload); // 除錯用
         
         const response = await fetch(WORKER_URL, {
             method: 'POST',
@@ -273,11 +285,15 @@ async function registerUser() {
         updateDebug('註冊回應: ' + JSON.stringify(result));
 
         if (result.ok || result.status === 'success' || result.success) {
-            $('btnText').textContent = '註冊成功！';
+            // 成功後提示
+            alert('✅ 申請成功！\n\n您的資料已送出，請等待管理員核准您的權限後即可進入後台。');
+            
+            $('btnText').textContent = '申請成功';
             localStorage.setItem('tdea_registered', 'true');
+            
             setTimeout(() => {
                 window.location.href = NEXT_PAGE;
-            }, 1000);
+            }, 500);
         } else {
             throw new Error(result.message || result.error || '伺服器回傳失敗');
         }
@@ -293,7 +309,7 @@ async function registerUser() {
 if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
     window.addEventListener('load', () => {
         setTimeout(() => {
-            if(!$('name').value) $('name').value = '測試管理員';
+            if(!$('name').value) $('name').value = '測試申請人';
             $('phone').value = '0912345678';
             console.log('🧪 開發模式：已自動填寫測試資料');
         }, 1000);
