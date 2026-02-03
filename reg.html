@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TDEA 註冊申請</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .loading { display: none; }
+        .loading.active { display: flex; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center p-4">
+
+    <div id="app" class="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
+        <div class="text-center mb-8">
+            <h1 class="text-2xl font-bold text-gray-800">TDEA 管理系統註冊</h1>
+            <p class="text-gray-500 mt-2">請填寫基本資料以申請操作權限</p>
+        </div>
+
+        <div id="regForm">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">LINE UserID</label>
+                <div id="userIdDisplay" class="bg-gray-100 p-3 rounded-lg text-xs font-mono text-gray-600 break-all">
+                    讀取中...
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">姓名</label>
+                <input type="text" id="userName" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="請輸入真實姓名">
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-1">電話</label>
+                <input type="tel" id="userPhone" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="例如：0912345678">
+            </div>
+
+            <button onclick="handleSubmit()" id="submitBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition duration-200">
+                送出註冊申請
+            </button>
+        </div>
+
+        <div id="resultMsg" class="hidden text-center py-10">
+            <div class="text-green-500 text-5xl mb-4">✓</div>
+            <h2 class="text-xl font-bold text-gray-800">申請已送出</h2>
+            <p class="text-gray-600 mt-2">請聯繫管理員進行審核開通</p>
+            <button onclick="liff.closeWindow()" class="mt-6 text-blue-600 font-medium">關閉視窗</button>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loader" class="loading fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50">
+        <div class="bg-white p-5 rounded-lg flex flex-col items-center">
+            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-2"></div>
+            <p class="text-sm">處理中...</p>
+        </div>
+    </div>
+
+    <script>
+        const LIFF_ID = '2005868456-cfANNVou';
+        const GAS_URL = 'https://script.google.com/macros/s/你的部署ID/exec'; // ⚠️ 請更換為您部署後的 Web App URL
+        
+        let currentUserId = "";
+
+        async function initLiff() {
+            try {
+                await liff.init({ liffId: LIFF_ID });
+                if (!liff.isLoggedIn()) {
+                    liff.login();
+                    return;
+                }
+                const profile = await liff.getProfile();
+                currentUserId = profile.userId;
+                document.getElementById('userIdDisplay').innerText = currentUserId;
+                
+                // 檢查是否已註冊過
+                checkStatus(currentUserId);
+            } catch (err) {
+                console.error('LIFF Init Error', err);
+                alert("LIFF 初始化失敗");
+            }
+        }
+
+        async function checkStatus(uid) {
+            showLoading(true);
+            try {
+                const res = await fetch(GAS_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'check', userId: uid })
+                });
+                const data = await res.json();
+                if (data.status === 'pending' || data.status === 'ok') {
+                    document.getElementById('regForm').classList.add('hidden');
+                    document.getElementById('resultMsg').classList.remove('hidden');
+                    if(data.status === 'ok') {
+                        document.querySelector('#resultMsg h2').innerText = "權限已開通";
+                        document.querySelector('#resultMsg p').innerText = "您可以開始使用系統功能了";
+                    }
+                }
+            } catch (e) { console.log("Check error", e); }
+            showLoading(false);
+        }
+
+        async function handleSubmit() {
+            const name = document.getElementById('userName').value.trim();
+            const phone = document.getElementById('userPhone').value.trim();
+
+            if (!name || !phone) {
+                alert("請填寫姓名與電話");
+                return;
+            }
+
+            showLoading(true);
+            try {
+                const response = await fetch(GAS_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'register',
+                        userId: currentUserId,
+                        name: name,
+                        phone: phone
+                    })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    document.getElementById('regForm').classList.add('hidden');
+                    document.getElementById('resultMsg').classList.remove('hidden');
+                } else {
+                    alert("申請失敗：" + result.message);
+                }
+            } catch (err) {
+                alert("連線至伺服器失敗，請確認 GAS 是否已正確部署。");
+            }
+            showLoading(false);
+        }
+
+        function showLoading(show) {
+            document.getElementById('loader').classList.toggle('active', show);
+        }
+
+        window.onload = initLiff;
+    </script>
+</body>
+</html>
