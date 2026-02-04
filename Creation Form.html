@@ -1,0 +1,337 @@
+<script type="text/babel">
+  /**
+   * 活動管理模組 v6.3.0 (關閉不重整優化版)
+   * 修改重點：
+   * 1. 修正 LotteryDrawer 的 onClose 行為，移除強制 refreshList。
+   * 2. 新增 onDataChange 機制，只有在真的抽獎/清除成功後才刷新列表。
+   */
+
+  const IconPlus = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>;
+
+  const getBatchColor = (batchNum) => {
+    const num = parseInt(String(batchNum).replace(/\D/g, '')) || 0;
+    const colors = ['text-red-600', 'text-blue-600', 'text-green-600', 'text-purple-600', 'text-orange-600', 'text-pink-600'];
+    return colors[(num - 1) % colors.length] || 'text-gray-800';
+  };
+
+  // --- 抽獎 Drawer ---
+  const LotteryDrawer = ({ isOpen, activity, onClose, onDataChange }) => {
+    const [candidates, setCandidates] = React.useState([]);
+    const [winners, setWinners] = React.useState([]);
+    const [loading, setLoading] = React.useState(true);
+    
+    const [drawCount, setDrawCount] = React.useState(1);
+    const [prizeName, setPrizeName] = React.useState("");
+    const [onlyCheckedIn, setOnlyCheckedIn] = React.useState(true);
+    const [drawing, setDrawing] = React.useState(false);
+
+    React.useEffect(() => {
+      if (isOpen && activity) {
+        setLoading(true);
+        if (typeof google !== 'undefined') {
+          google.script.run.withSuccessHandler((res) => {
+            const all = res || [];
+            const w = all.filter(p => p.batch && p.batch !== "");
+            w.sort((a, b) => parseInt(String(b.batch).replace(/\D/g,'')) - parseInt(String(a.batch).replace(/\D/g,'')));
+            setCandidates(all);
+            setWinners(w);
+            setLoading(false);
+          }).getLotteryParticipants(activity['活動試算表ID']);
+        } else { setTimeout(() => setLoading(false), 500); }
+      }
+    }, [isOpen, activity]);
+
+    const handleDraw = () => {
+      if (!prizeName) { alert("請輸入獎項名稱！"); return; }
+      if (drawCount <= 0) { alert("人數錯誤"); return; }
+      const pool = candidates.filter(p => {
+        const isWin = p.batch && p.batch !== "";
+        const isCheck = p.status !== "未簽到" && p.status !== "";
+        if (isWin) return false;
+        if (onlyCheckedIn && !isCheck) return false;
+        return true;
+      });
+      if (pool.length < drawCount) { alert(`合格人數不足 (僅 ${pool.length} 人)`); return; }
+
+      setDrawing(true);
+      const newWinners = [];
+      const poolCopy = [...pool];
+      for (let i = 0; i < drawCount; i++) {
+        const idx = Math.floor(Math.random() * poolCopy.length);
+        const winner = poolCopy.splice(idx, 1)[0];
+        winner.prize = prizeName;
+        newWinners.push({ row: winner._row, prize: prizeName });
+      }
+
+      if (typeof google !== 'undefined') {
+        google.script.run.withSuccessHandler((res) => {
+          setDrawing(false);
+          if (res.success) {
+            alert(`🎉 第 ${res.batch} 梯次抽獎完成！`);
+            const newBatchList = newWinners.map(nw => {
+                const p = candidates.find(c => c._row === nw.row);
+                return { ...p, prize: nw.prize, batch: res.batch };
+            });
+            setWinners([...newBatchList, ...winners]);
+            setCandidates(prev => prev.map(p => {
+              const win = newWinners.find(w => w.row === p._row);
+              return win ? { ...p, prize: win.prize, batch: res.batch } : p;
+            }));
+            // 觸發外部刷新 (只更新數字，不重整畫面)
+            if (onDataChange) onDataChange();
+          } else { alert("存檔失敗: " + res.error); }
+        }).saveLotteryResults(activity['活動試算表ID'], newWinners);
+      }
+    };
+
+    const handleClear = () => {
+      if (!confirm("確定清除所有紀錄？")) return;
+      google.script.run.withSuccessHandler(() => {
+        setCandidates(prev => prev.map(p => ({ ...p, prize: "", batch: "" })));
+        setWinners([]);
+        if (onDataChange) onDataChange();
+      }).clearLotteryData(activity['活動試算表ID']);
+    };
+    const handlePrint = () => { window.print(); };
+    const handleDownloadCSV = () => {
+      if (winners.length === 0) return;
+      const headers = ["梯次", "獎項", "姓名", "電話"];
+      const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + headers.join(",") + "\n" + 
+        winners.map(w => `第${w.batch}梯,${w.prize},${w.name},${w.phone}`).join("\n");
+      const link = document.createElement("a");
+      link.href = encodeURI(csvContent);
+      link.download = `中獎名單_${activity['活動名稱']}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+
+    const totalCount = candidates.length;
+    const qualifiedCount = candidates.filter(p => !p.batch && (!onlyCheckedIn || (p.status !== "未簽到" && p.status !== ""))).length;
+
+    if (!isOpen || !activity) return null;
+
+    return (
+      <div className="fixed inset-0 z-[200] flex justify-end">
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity" onClick={onClose}></div>
+        <div className="relative w-full max-w-5xl bg-gray-50 h-full shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out overflow-hidden animate-in slide-in-from-right">
+          <div className="bg-[#fceda2] p-8 text-center shadow-sm relative print:shadow-none flex-shrink-0">
+            <div className="absolute top-6 left-6 print:hidden">
+               <button onClick={onClose} className="bg-white/90 hover:bg-white text-gray-800 px-5 py-2 rounded-xl font-bold shadow-md transition-all text-base flex items-center gap-2"><span>←</span> 返回列表</button>
+            </div>
+            <h1 className="text-4xl font-black text-red-600 tracking-wider mb-2 mt-2">馬年好運到、馬上有錢</h1>
+            <h2 className="text-3xl font-bold text-gray-800">幸運抽抽樂</h2>
+            <p className="text-gray-700 mt-3 font-bold text-xl bg-white/50 inline-block px-6 py-1 rounded-full">{activity['活動名稱']}</p>
+          </div>
+          <div className="p-6 bg-white shadow-sm border-b print:hidden flex-shrink-0">
+            <div className="flex flex-wrap gap-6 items-end justify-center">
+              <div><label className="block text-xs font-bold text-gray-500 mb-1">獎項名稱</label><input className="border-2 p-2 rounded-lg w-48 text-base" placeholder="輸入獎項" value={prizeName} onChange={e => setPrizeName(e.target.value)} /></div>
+              <div><label className="block text-xs font-bold text-gray-500 mb-1">人數</label><input type="number" className="border-2 p-2 rounded-lg w-24 text-base" value={drawCount} onChange={e => setDrawCount(e.target.value)} /></div>
+              <div className="flex gap-2">
+                <button onClick={handleDraw} disabled={drawing} className="bg-[#28a745] text-white px-6 py-2 rounded-lg font-bold shadow-md hover:brightness-105 disabled:opacity-50 text-base">{drawing ? "..." : "開始抽獎"}</button>
+                <button onClick={handlePrint} className="bg-[#ffc107] text-gray-900 px-4 py-2 rounded-lg font-bold shadow-md hover:brightness-105 text-base">PDF</button>
+                <button onClick={handleDownloadCSV} className="bg-[#007bff] text-white px-4 py-2 rounded-lg font-bold shadow-md hover:brightness-105 text-base">CSV</button>
+                <button onClick={handleClear} className="bg-[#dc3545] text-white px-4 py-2 rounded-lg font-bold shadow-md hover:brightness-105 text-base">清除</button>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-100 py-2 text-center text-base font-bold text-gray-700 border-b print:hidden flex-shrink-0">
+            總名單：<span className="text-blue-600">{totalCount}</span> | 合格可抽：<span className="text-green-600">{qualifiedCount}</span>
+            <label className="ml-4 cursor-pointer inline-flex items-center gap-2 bg-white px-3 py-0.5 rounded border shadow-sm"><input type="checkbox" className="w-4 h-4" checked={onlyCheckedIn} onChange={e => setOnlyCheckedIn(e.target.checked)} /> <span className="text-sm">僅限已簽到</span></label>
+          </div>
+          <div className="flex-1 p-6 overflow-auto print:p-0 print:overflow-visible">
+            <div className="max-w-5xl mx-auto bg-white rounded-xl shadow-lg border overflow-hidden print:shadow-none print:border-none">
+              <table className="w-full text-base text-left">
+                <thead className="bg-gray-100 border-b-2 border-gray-300 print:bg-gray-50"><tr><th className="p-4 font-black text-gray-700">梯次</th><th className="p-4 font-black text-gray-700">獎項</th><th className="p-4 font-black text-gray-700">姓名</th><th className="p-4 font-black text-gray-700">電話</th></tr></thead>
+                <tbody className="divide-y divide-gray-200">
+                  {winners.length === 0 ? <tr><td colSpan="4" className="p-16 text-center text-gray-400 italic text-lg">目前尚無中獎紀錄</td></tr> : winners.map((w, i) => (
+                    <tr key={i} className="hover:bg-yellow-50 transition-colors">
+                      <td className={`p-4 font-black ${getBatchColor(w.batch)}`}>第 {w.batch} 梯</td>
+                      <td className="p-4 font-bold text-gray-900">{w.prize}</td>
+                      <td className="p-4 font-bold text-gray-900">{w.name}</td>
+                      <td className="p-4 text-gray-600 font-mono">{w.phone}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ... (ReclassifyModal, CreateActivityModal, DetailsRow 保持不變) ...
+  const ReclassifyModal = ({ isOpen, onClose, target, onConfirm }) => {
+    const [newType, setNewType] = React.useState('講座類');
+    const [loading, setLoading] = React.useState(false);
+    React.useEffect(() => { if (target) setNewType(target['活動類型'] || '講座類'); }, [target]);
+    if (!isOpen || !target) return null;
+    const handleConfirm = () => {
+      setLoading(true);
+      if (typeof google !== 'undefined') {
+        google.script.run.withSuccessHandler((res) => { setLoading(false); if(res.success){ onConfirm(); onClose(); } else { alert(res.error); } }).updateActivityType(target['活動名稱'], newType);
+      }
+    };
+    return (
+      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div className="bg-white w-full max-w-sm rounded-xl shadow-2xl p-6">
+          <h3 className="text-xl font-bold mb-4">🏷️ 重新分類: {target['活動名稱']}</h3>
+          <select className="w-full border p-3 rounded-lg mb-6 text-base" value={newType} onChange={(e) => setNewType(e.target.value)}><option>講座類</option><option>教學類</option><option>聯誼類</option><option>其他</option></select>
+          <div className="flex gap-3"><button onClick={onClose} className="flex-1 py-2 border rounded-lg">取消</button><button onClick={handleConfirm} disabled={loading} className="flex-[2] py-2 bg-purple-600 text-white rounded-lg">{loading ? "..." : "確認"}</button></div>
+        </div>
+      </div>
+    );
+  };
+
+  const CreateActivityModal = ({ isOpen, onClose, onSaved }) => {
+    const [form, setForm] = React.useState({ name: '', content: '', type: '講座類', courseTime: '', deadline: '', capacity: '20', needMeal: false });
+    const [loading, setLoading] = React.useState(false);
+    if (!isOpen) return null;
+    const handleSubmit = () => {
+      if (!form.name) { alert("請輸入活動名稱"); return; }
+      setLoading(true);
+      if (typeof google !== 'undefined') {
+        google.script.run.withSuccessHandler((res) => { setLoading(false); if (res.success) { alert("✨ 成功！"); onSaved(); onClose(); setForm({ name: '', content: '', type: '講座類', courseTime: '', deadline: '', capacity: '20', needMeal: false }); } else { alert("錯誤: " + res.error); } }).createNewActivityWithForm(form);
+      }
+    };
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" style={{ zIndex: 9999 }}>
+        <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+          <div className="px-8 py-6 border-b bg-gray-50 flex justify-between items-center"><div className="flex items-center gap-2"><span className="text-2xl">✨</span><h2 className="text-2xl font-black text-black">創建新活動</h2></div><button onClick={onClose} className="text-gray-500 hover:text-red-600 text-2xl font-bold">&times;</button></div>
+          <div className="p-8 overflow-y-auto space-y-5">
+            <div><label className="block text-sm font-bold text-black mb-1">活動名稱</label><input className="w-full border p-3 rounded-lg font-bold text-black" value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
+            <div><label className="block text-sm font-bold text-black mb-1">活動內容</label><textarea className="w-full border p-3 rounded-lg h-24 text-black" value={form.content} onChange={e => setForm({...form, content: e.target.value})} /></div>
+            <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-bold text-black mb-1">類型</label><select className="w-full border p-3 rounded-lg text-black bg-white" value={form.type} onChange={e => setForm({...form, type: e.target.value})}><option>講座類</option><option>教學類</option><option>聯誼類</option><option>其他</option></select></div><div><label className="block text-sm font-bold text-black mb-1">限額</label><input type="number" className="w-full border p-3 rounded-lg text-black" value={form.capacity} onChange={e => setForm({...form, capacity: e.target.value})} /></div></div>
+            <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-bold text-black mb-1">時間</label><input className="w-full border p-3 rounded-lg text-black" placeholder="YYYY-MM-DD" value={form.courseTime} onChange={e => setForm({...form, courseTime: e.target.value})} /></div><div><label className="block text-sm font-bold text-black mb-1">截止</label><input className="w-full border p-3 rounded-lg text-black" placeholder="YYYY-MM-DD" value={form.deadline} onChange={e => setForm({...form, deadline: e.target.value})} /></div></div>
+            <div className="pt-2"><label className="flex items-center gap-3 p-4 border rounded-xl bg-gray-50 cursor-pointer"><input type="checkbox" className="w-5 h-5 text-green-600 rounded" checked={form.needMeal} onChange={e => setForm({...form, needMeal: e.target.checked})} /><div><div className="text-sm font-bold text-black">提供餐點？</div></div></label></div>
+          </div>
+          <div className="p-6 border-t bg-gray-50 flex gap-3"><button onClick={onClose} className="flex-1 bg-white border font-bold py-3 rounded-xl">取消</button><button onClick={handleSubmit} disabled={loading} className="flex-[2] bg-[#5cb85c] hover:bg-green-600 text-white font-bold py-3 rounded-xl shadow-lg">{loading ? "處理中..." : "確認創建"}</button></div>
+        </div>
+      </div>
+    );
+  };
+
+  const DetailsRow = ({ activity, onClose, onCountUpdate }) => {
+    const [details, setDetails] = React.useState([]);
+    const [loading, setLoading] = React.useState(true);
+    const fetchDetails = () => { setLoading(true); if (typeof google !== 'undefined') { google.script.run.withSuccessHandler((res) => { setDetails(res.error ? [] : res); setLoading(false); }).getActivityDetails(activity['活動試算表ID']); } else { setTimeout(() => { setDetails([{ "報名ID": "R1", "姓名": "測試人員", "電話": "0900", "核銷狀態": "未簽到" }]); setLoading(false); }, 800); } };
+    const handleCheckIn = (row) => {
+      const newStatus = (row['核銷狀態'] === '未簽到' || row['核銷狀態'] === '') ? new Date().toLocaleString() : '未簽到';
+      setDetails(prev => prev.map(d => d._row === row._row ? { ...d, '核銷狀態': newStatus } : d));
+      if (typeof google !== 'undefined') { google.script.run.toggleCheckInStatus(activity['活動試算表ID'], row._row, row['核銷狀態']); }
+    };
+    React.useEffect(() => { fetchDetails(); }, []);
+    return (
+      <tr className="bg-gray-50 border-b border-gray-200">
+        <td colSpan="5" className="p-4">
+          <div className="bg-white rounded-xl border border-blue-100 shadow-inner p-6">
+            <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
+              <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">📂 報名明細：{activity['活動名稱']}</h3>
+              <div className="flex gap-2"><button onClick={fetchDetails} className="bg-blue-50 text-blue-600 px-3 py-1 rounded-lg text-xs font-bold">刷新</button><button onClick={onClose} className="bg-gray-100 text-gray-600 px-3 py-1 rounded-lg text-xs font-bold">關閉</button></div>
+            </div>
+            {loading ? <div className="text-center py-4 text-gray-400">讀取中...</div> : details.length === 0 ? <div className="text-center py-4 text-gray-400">尚無報名</div> : (
+              <table className="w-full text-sm text-left">
+                <thead><tr className="border-b text-gray-500"><th className="pb-2">姓名</th><th className="pb-2">電話</th><th className="pb-2">狀態</th><th className="pb-2">操作</th></tr></thead>
+                <tbody>{details.map((row, idx) => (
+                  <tr key={idx} className="border-b last:border-0"><td className="py-2 font-bold">{row['姓名']}</td><td className="py-2">{row['電話']}</td><td className="py-2">{row['核銷狀態'] !== '未簽到' && row['核銷狀態'] !== '' ? <span className="text-green-600 font-bold bg-green-50 px-2 py-1 rounded border border-green-100 text-xs">{row['核銷狀態']}</span> : <span className="text-red-400 font-bold">未簽到</span>}</td><td className="py-2"><button onClick={() => handleCheckIn(row)} className={`px-3 py-1 rounded text-xs text-white shadow-sm ${row['核銷狀態'] !== '未簽到' && row['核銷狀態'] !== '' ? 'bg-gray-400' : 'bg-[#428bca]'}`}>{row['核銷狀態'] !== '未簽到' && row['核銷狀態'] !== '' ? '取消' : '核銷'}</button></td></tr>
+                ))}</tbody>
+              </table>
+            )}
+            <div className="mt-6 pt-4 border-t border-gray-100 flex justify-center"><button onClick={onClose} className="text-blue-500 font-bold text-sm">↑ 收起明細</button></div>
+          </div>
+        </td>
+      </tr>
+    );
+  };
+
+  const ActivityManagementModule = () => {
+    const [list, setList] = React.useState([]);
+    const [loading, setLoading] = React.useState(true);
+    const [isModalOpen, setIsModalOpen] = React.useState(false);
+    const [reclassifyTarget, setReclassifyTarget] = React.useState(null);
+    const [lotteryTarget, setLotteryTarget] = React.useState(null);
+    const [expandedId, setExpandedId] = React.useState(null);
+    const [sortOrder, setSortOrder] = React.useState('latest');
+
+    const refreshList = () => {
+      setLoading(true);
+      setExpandedId(null);
+      if (typeof google !== 'undefined') {
+        google.script.run.withSuccessHandler(res => { setList(res || []); setLoading(false); }).getActivityList();
+      } else { setTimeout(() => { setList([{ "_row": 1, "活動名稱": "演示活動", "報名人數": 5, "核銷人數": 2, "活動試算表ID": "mock" }]); setLoading(false); }, 500); }
+    };
+
+    const handleDeactivate = (name) => {
+      if (!confirm(`確定要下架「${name}」？`)) return;
+      setLoading(true);
+      google.script.run.withSuccessHandler(() => refreshList()).updateActivityStatus(name, "下架");
+    };
+
+    const handleCountUpdate = (activityId, delta) => {
+      setList(prev => prev.map(a => a._row === activityId ? { ...a, '核銷人數': parseInt(a['核銷人數']) + delta } : a));
+    };
+
+    const sortedList = React.useMemo(() => {
+      return [...list].sort((a, b) => {
+        const tA = new Date(a["課程時間"] || 0).getTime();
+        const tB = new Date(b["課程時間"] || 0).getTime();
+        return sortOrder === 'latest' ? tB - tA : tA - tB;
+      });
+    }, [list, sortOrder]);
+
+    React.useEffect(() => { refreshList(); }, []);
+
+    return (
+      <div className="p-6">
+        <CreateActivityModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSaved={refreshList} />
+        <ReclassifyModal isOpen={!!reclassifyTarget} target={reclassifyTarget} onClose={() => setReclassifyTarget(null)} onConfirm={refreshList} />
+        
+        {/* Drawer 形式的抽獎頁面 */}
+        <LotteryDrawer 
+          isOpen={!!lotteryTarget} 
+          activity={lotteryTarget} 
+          onClose={() => setLotteryTarget(null)} // 僅關閉 Drawer，不重整列表
+          onDataChange={refreshList} // 新增：僅在資料變更時重整
+        />
+        
+        <div className="flex justify-between items-center mb-8">
+          <div className="flex gap-4"><button onClick={() => setIsModalOpen(true)} className="bg-[#5cb85c] text-white px-6 py-3 rounded-xl font-bold shadow-md flex gap-2 active:scale-95"><IconPlus /> 創建新活動</button><button onClick={refreshList} className="bg-[#428bca] text-white px-6 py-3 rounded-xl font-bold shadow-md active:scale-95">🔄 重新載入</button></div>
+          <div className="flex items-center gap-2 bg-white border border-gray-200 p-2 rounded-xl shadow-sm"><span className="text-sm font-bold text-gray-400 px-2 border-r">排序</span><select value={sortOrder} onChange={e => setSortOrder(e.target.value)} className="text-sm font-bold text-gray-600 outline-none bg-transparent"><option value="latest">建立時間 (最晚)</option><option value="earliest">建立時間 (最早)</option></select></div>
+        </div>
+
+        <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+          <table className="w-full text-sm">
+            <thead><tr className="bg-gray-50 border-b text-gray-600"><th className="px-6 py-4 text-left font-bold border-r">活動名稱</th><th className="px-4 py-4 w-24 font-bold border-r text-center">報名</th><th className="px-4 py-4 w-24 font-bold border-r text-center">核銷</th><th className="px-4 py-4 w-24 font-bold border-r text-center text-yellow-600">獎項</th><th className="px-6 py-4 font-bold text-center">操作</th></tr></thead>
+            <tbody className="divide-y divide-gray-100">
+              {loading ? <tr><td colSpan="5" className="p-20 text-center text-gray-400">讀取中...</td></tr> : sortedList.length === 0 ? <tr><td colSpan="5" className="p-20 text-center text-gray-400 italic">無資料</td></tr> : sortedList.map((act, i) => (
+                <React.Fragment key={i}>
+                  <tr className={`transition-colors ${expandedId === act._row ? 'bg-blue-50/50' : 'hover:bg-gray-50'}`}>
+                    <td className="px-6 py-5 text-left font-bold text-gray-700 border-r border-gray-200">{act['活動名稱']}</td>
+                    <td className="py-5 font-bold text-blue-600 border-r border-gray-200 text-center text-lg">{act['報名人數']}</td>
+                    <td className="py-5 text-center text-gray-600 border-r border-gray-200 text-lg">{act['核銷人數']}</td>
+                    <td className="py-5 text-center text-yellow-600 border-r border-gray-200 text-lg font-bold">{act['獎項'] || 0}</td>
+                    <td className="py-3 px-6">
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="text-sm text-gray-600 mb-1 w-full text-center">課程: <span className="font-bold">{act['課程時間']}</span> | <span className="text-red-500 font-bold">截止: {act['截止日期']}</span></div>
+                        <div className="flex justify-center gap-2">
+                          <a href={act['報名前端網址'] || "#"} target="_blank" className={`bg-[#10b981] text-white px-3 py-2 rounded-lg text-xs font-bold shadow-sm flex items-center ${(!act['報名前端網址']) ? 'opacity-30' : ''}`}>網址</a>
+                          <button onClick={() => setExpandedId(expandedId === act._row ? null : act._row)} className={`px-4 py-2 rounded-lg text-xs font-bold shadow-sm ${expandedId === act._row ? 'bg-gray-500' : 'bg-[#428bca]'} text-white`}>{expandedId === act._row ? '收起' : '明細'}</button>
+                          <button onClick={() => setReclassifyTarget(act)} className="bg-[#6f42c1] text-white px-4 py-2 rounded-lg text-xs font-bold shadow-sm">分類</button>
+                          <button onClick={() => handleDeactivate(act['活動名稱'])} className="bg-[#ef4444] text-white px-4 py-2 rounded-lg text-xs font-bold shadow-sm">下架</button>
+                          <button onClick={() => setLotteryTarget(act)} className="bg-[#f0ad4e] text-white px-4 py-2 rounded-lg text-xs font-bold shadow-sm">抽獎</button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                  {expandedId === act._row && <DetailsRow activity={act} onClose={() => setExpandedId(null)} onCountUpdate={(delta) => handleCountUpdate(act._row, delta)} />}
+                </React.Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+  window.ActivityManagementModule = ActivityManagementModule;
+</script>
