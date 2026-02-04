@@ -20,10 +20,12 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .bg-head { background-color: #f9fafb; }
-        /* 抽屜動畫 */
+        
+        /* 抽屜與彈窗 */
         .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 50; transition: opacity 0.3s; }
-        .drawer-content { position: fixed; right: 0; top: 0; bottom: 0; width: 400px; background: white; z-index: 51; box-shadow: -5px 0 20px rgba(0,0,0,0.2); transition: transform 0.3s ease-out; transform: translateX(100%); display: flex; flex-direction: column; }
+        .drawer-content { position: fixed; right: 0; top: 0; bottom: 0; width: 450px; background: white; z-index: 51; box-shadow: -5px 0 20px rgba(0,0,0,0.2); transition: transform 0.3s ease-out; transform: translateX(100%); display: flex; flex-direction: column; }
         .drawer-open .drawer-content { transform: translateX(0); }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
     </style>
 </head>
 <body>
@@ -32,7 +34,7 @@
     <script type="text/babel">
         const { useState, useEffect, useContext, createContext, Fragment, useMemo } = React;
         const LIFF_ID = "2005868456-cfANNVou"; 
-        const GAS_URL = "https://script.google.com/macros/s/AKfycbwhA71RaQbOFuF34utPWWhPo2zC58VcLWKASCkZQnIeWd7noH7kR_CI99UmAtrpAP5-/exec";
+        const GAS_URL = "https://script.google.com/macros/s/AKfycby6nv5l_h0M-iBL-B826jX-feDVveeRmjjobZbnCgh3unfZQfpk6I4_FrZerfmESUt_/exec";
         const UserContext = createContext(null);
 
         async function callAPI(action, data = {}) {
@@ -99,7 +101,7 @@
             return <UserContext.Provider value={{...userProfile}}>{children}</UserContext.Provider>;
         };
 
-        // --- 抽獎與活動組件 (整合您提供的程式碼) ---
+        // --- 核心組件 ---
         const getBatchColor = (b) => { const n = parseInt(String(b).replace(/\D/g, ''))||0; return ['text-red-600','text-blue-600','text-green-600','text-purple-600'][n%4] || 'text-gray-800'; };
 
         const LotteryDrawer = ({ isOpen, activity, onClose, onDataChange }) => {
@@ -194,29 +196,39 @@
             );
         };
 
+        // 🌟 修復後的創建活動彈窗 (Z-index 修正 + 日期選擇器)
         const CreateActivityModal = ({ isOpen, onClose, onSaved }) => {
-            const [form, setForm] = useState({ name: '', type: '講座類', courseTime: '', deadline: '', capacity: '20' });
+            const [form, setForm] = useState({ name: '', type: '講座類', courseTime: '', deadline: '', capacity: '20', needMeal: false });
             const [loading, setLoading] = useState(false);
             if (!isOpen) return null;
             const handleSubmit = async () => {
                 setLoading(true);
                 const res = await callAPI('createActivity', { data: form });
                 setLoading(false);
-                if(res.success) { onSaved(); onClose(); setForm({ name: '', type: '講座類', courseTime: '', deadline: '', capacity: '20' }); }
+                if(res.success) { onSaved(); onClose(); setForm({ name: '', type: '講座類', courseTime: '', deadline: '', capacity: '20', needMeal: false }); }
                 else alert(res.error);
             };
             return (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-                    <div className="bg-white w-full max-w-lg rounded-xl shadow-2xl p-6">
-                        <h3 className="text-xl font-bold mb-4">創建新活動</h3>
+                <div className="modal-overlay">
+                    <div className="bg-white w-full max-w-lg rounded-xl shadow-2xl p-6 relative">
+                        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-red-500 font-bold text-xl">&times;</button>
+                        <h3 className="text-2xl font-black mb-6 flex items-center gap-2">✨ 創建新活動</h3>
                         <div className="space-y-4">
-                            <input className="w-full border p-2 rounded" placeholder="活動名稱" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
-                            <div className="grid grid-cols-2 gap-2">
-                                <input className="border p-2 rounded" placeholder="日期 (YYYY-MM-DD)" value={form.courseTime} onChange={e => setForm({...form, courseTime: e.target.value})} />
-                                <input className="border p-2 rounded" placeholder="截止日" value={form.deadline} onChange={e => setForm({...form, deadline: e.target.value})} />
+                            <div><label className="text-xs font-bold text-gray-500 block mb-1">活動名稱</label><input className="w-full border p-2 rounded-lg font-bold" value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className="text-xs font-bold text-gray-500 block mb-1">活動日期</label><input type="date" className="w-full border p-2 rounded-lg" value={form.courseTime} onChange={e => setForm({...form, courseTime: e.target.value})} /></div>
+                                <div><label className="text-xs font-bold text-gray-500 block mb-1">報名截止</label><input type="date" className="w-full border p-2 rounded-lg" value={form.deadline} onChange={e => setForm({...form, deadline: e.target.value})} /></div>
                             </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className="text-xs font-bold text-gray-500 block mb-1">類型</label><select className="w-full border p-2 rounded-lg bg-white" value={form.type} onChange={e => setForm({...form, type: e.target.value})}><option>講座類</option><option>教學類</option><option>聯誼類</option><option>其他</option></select></div>
+                                <div><label className="text-xs font-bold text-gray-500 block mb-1">人數上限</label><input type="number" className="w-full border p-2 rounded-lg" value={form.capacity} onChange={e => setForm({...form, capacity: e.target.value})} /></div>
+                            </div>
+                            <label className="flex items-center gap-2 mt-2"><input type="checkbox" checked={form.needMeal} onChange={e => setForm({...form, needMeal: e.target.checked})} /> <span className="text-sm font-bold">是否提供餐點</span></label>
                         </div>
-                        <div className="mt-6 flex gap-2"><button onClick={onClose} className="flex-1 border py-2 rounded">取消</button><button onClick={handleSubmit} disabled={loading} className="flex-[2] bg-green-600 text-white py-2 rounded">{loading?"...":"創建"}</button></div>
+                        <div className="mt-8 flex gap-3">
+                            <button onClick={onClose} className="flex-1 bg-gray-100 py-3 rounded-xl font-bold text-gray-600">取消</button>
+                            <button onClick={handleSubmit} disabled={loading} className="flex-[2] bg-green-600 text-white py-3 rounded-xl font-bold shadow-lg">{loading?"創建中...":"確認創建"}</button>
+                        </div>
                     </div>
                 </div>
             );
@@ -287,7 +299,6 @@
             );
         };
 
-        // 🌟 編輯抽屜組件 (優化版：大備註框 + 按鈕位置調整)
         const EditDrawer = ({ isOpen, onClose, item, sheetName, onSaved }) => {
             const [formData, setFormData] = useState({});
             const [isSaving, setIsSaving] = useState(false);
@@ -308,41 +319,35 @@
 
             return (
                 <div className={`drawer-overlay ${isOpen ? '' : 'pointer-events-none opacity-0'}`} onClick={onClose}>
-                    <div className={`drawer-content p-6 flex flex-col ${isOpen ? 'translate-x-0' : ''}`} onClick={e => e.stopPropagation()}>
-                        <div className="flex justify-between items-center mb-6">
+                    <div className={`drawer-content ${isOpen ? 'translate-x-0' : ''}`} onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center p-6 border-b">
                             <h3 className="text-xl font-bold">✏️ 編輯資料</h3>
                             <button onClick={onClose} className="text-gray-500 hover:text-red-500 text-2xl">&times;</button>
                         </div>
-                        <div className="flex-1 overflow-y-auto space-y-4">
+                        <div className="flex-1 overflow-y-auto p-6 space-y-5">
                             {fields.map(field => (
                                 <div key={field}>
                                     <label className="text-xs font-bold text-gray-500 block mb-1">{field}</label>
                                     {field === "備註" ? (
-                                        <textarea className="w-full border p-2 rounded-lg outline-none focus:ring-2 focus:ring-green-500 h-32"
-                                            value={formData[field] || ""} 
-                                            onChange={e => setFormData({...formData, [field]: e.target.value})}></textarea>
+                                        <textarea className="w-full border p-3 rounded-lg outline-none focus:ring-2 focus:ring-green-500 bg-gray-50 h-40 resize-none"
+                                            value={formData[field] || ""} onChange={e => setFormData({...formData, [field]: e.target.value})} placeholder="請輸入備註..."></textarea>
                                     ) : field === "資格" ? (
-                                        <select className="w-full border p-2 rounded-lg outline-none focus:ring-2 focus:ring-green-500 bg-white"
-                                            value={formData[field] || ""} 
-                                            onChange={e => setFormData({...formData, [field]: e.target.value})}>
-                                            <option value="">請選擇</option>
-                                            <option value="Y">Y</option>
-                                            <option value="N">N</option>
+                                        <select className="w-full border p-3 rounded-lg outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                                            value={formData[field] || ""} onChange={e => setFormData({...formData, [field]: e.target.value})}>
+                                            <option value="">請選擇</option><option value="Y">Y</option><option value="N">N</option>
                                         </select>
                                     ) : (
-                                        <input className="w-full border p-2 rounded-lg outline-none focus:ring-2 focus:ring-green-500" 
-                                            value={formData[field] || ""} 
-                                            onChange={e => setFormData({...formData, [field]: e.target.value})} />
+                                        <input className="w-full border p-3 rounded-lg outline-none focus:ring-2 focus:ring-green-500 bg-gray-50" 
+                                            value={formData[field] || ""} onChange={e => setFormData({...formData, [field]: e.target.value})} />
                                     )}
                                 </div>
                             ))}
-                            {/* 按鈕移到表單下方 */}
-                            <div className="mt-6 flex gap-3">
-                                <button onClick={onClose} className="flex-1 bg-gray-100 py-3 rounded-xl font-bold text-gray-600">取消</button>
-                                <button onClick={handleSave} disabled={isSaving} className="flex-[2] bg-green-500 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-green-600">
-                                    {isSaving ? "儲存中..." : "確認儲存"}
-                                </button>
-                            </div>
+                        </div>
+                        <div className="p-6 border-t bg-gray-50 flex gap-3 shadow-lg z-10">
+                            <button onClick={onClose} className="flex-1 bg-white border border-gray-300 py-3 rounded-xl font-bold text-gray-600 hover:bg-gray-50 transition">取消</button>
+                            <button onClick={handleSave} disabled={isSaving} className="flex-[2] bg-green-500 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-green-600 transition disabled:opacity-50">
+                                {isSaving ? "儲存中..." : "確認儲存"}
+                            </button>
                         </div>
                     </div>
                 </div>
