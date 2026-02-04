@@ -32,7 +32,7 @@
     <script type="text/babel">
         const { useState, useEffect, useContext, createContext, Fragment, useMemo } = React;
         const LIFF_ID = "2005868456-cfANNVou"; 
-        const GAS_URL = "https://script.google.com/macros/s/AKfycbyj6KjGZ1UEEwjbhpcJomAF_9gyvzE0fIE-VwqZmO1rAk_5fVRSJieWPWJRO4VoopBo/exec";
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbzKghpYvCSjymxKbZ9tWjTZYJMEGk9uvgnQM-6oBtmFVlLFNKRQLwAHIOFyIkDS2IM/exec";
         const UserContext = createContext(null);
 
         async function callAPI(action, data = {}) {
@@ -102,7 +102,7 @@
         // --- 抽獎與活動組件 ---
         const getBatchColor = (b) => { const n = parseInt(String(b).replace(/\D/g, ''))||0; return ['text-red-600','text-blue-600','text-green-600','text-purple-600'][n%4] || 'text-gray-800'; };
 
-        // 🌟 修正後的滿版抽獎 Drawer (表格拉開 + 置中)
+        // 🌟 全版抽獎 UI (寬度優化 + 置中)
         const LotteryDrawer = ({ isOpen, activity, onClose, onDataChange }) => {
             const [candidates, setCandidates] = useState([]);
             const [winners, setWinners] = useState([]);
@@ -134,11 +134,12 @@
                     newWinners.push({ row: w._row, prize: prizeName });
                 }
 
-                const res = await callAPI('saveLotteryResults', { id: activity['活動試算表ID'], winners: newWinners });
+                // 樂觀更新 (先更新 UI)
                 setDrawing(false);
+                const res = await callAPI('saveLotteryResults', { id: activity['活動試算表ID'], winners: newWinners });
+                
                 if (res.success) {
-                    alert(`🎉 第 ${res.batch} 梯次抽獎完成！`);
-                    onDataChange();
+                    // 更新本地顯示
                     const batchList = newWinners.map(nw => {
                         const p = candidates.find(c => c._row === nw.row);
                         return { ...p, prize: nw.prize, batch: res.batch };
@@ -148,7 +149,8 @@
                         const win = newWinners.find(w => w.row === p._row);
                         return win ? { ...p, prize: win.prize, batch: res.batch } : p;
                     }));
-                } else alert("錯誤: " + res.error);
+                    onDataChange();
+                } else alert("存檔錯誤，請重試");
             };
 
             const handleClear = async () => {
@@ -178,12 +180,11 @@
                     <div className="bg-gray-100 py-3 text-center text-base font-bold text-gray-700 border-b">
                         總名單：{candidates.length} 人 | <label className="cursor-pointer ml-4"><input type="checkbox" className="w-4 h-4" checked={onlyCheckedIn} onChange={e=>setOnlyCheckedIn(e.target.checked)}/> 僅限已簽到</label>
                     </div>
-                    <div className="flex-1 overflow-auto p-8 bg-gray-50">
-                        {/* 🌟 修正：表格置中並寬度拉到 90% */}
-                        <table className="w-[90%] mx-auto text-lg text-center bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div className="flex-1 overflow-auto p-8 bg-gray-50 flex justify-center">
+                        <table className="w-[95%] max-w-7xl text-lg text-center bg-white rounded-xl shadow-lg overflow-hidden h-fit">
                             <thead className="bg-gray-200 text-gray-700">
                                 <tr>
-                                    <th className="p-4 text-center">梯次</th>
+                                    <th className="p-4 text-center w-32">梯次</th>
                                     <th className="p-4 text-center">獎項</th>
                                     <th className="p-4 text-center">姓名</th>
                                     <th className="p-4 text-center">電話</th>
@@ -290,7 +291,7 @@
                                         <td className="p-4 text-center font-bold text-blue-600">{act['報名人數']}</td>
                                         <td className="p-4 text-center text-gray-600">{act['核銷人數']}</td>
                                         <td className="p-4 text-center">{act['狀態']}</td>
-                                        <td className="p-4 text-center min-w-[480px] whitespace-nowrap">
+                                        <td className="p-4 text-center min-w-[550px] whitespace-nowrap">
                                             <div className="flex gap-2 justify-center">
                                                 <a href={act['報名前端網址']} target="_blank" className="bg-gray-200 px-3 py-1 rounded text-xs font-bold hover:bg-gray-300">網址</a>
                                                 <button className="bg-blue-500 text-white px-3 py-1 rounded text-xs font-bold hover:bg-blue-600">明細</button>
