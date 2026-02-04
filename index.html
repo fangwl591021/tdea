@@ -34,7 +34,7 @@
     <script type="text/babel">
         const { useState, useEffect, useContext, createContext, Fragment, useMemo } = React;
         const LIFF_ID = "2005868456-cfANNVou"; 
-        const GAS_URL = "https://script.google.com/macros/s/AKfycbwFBxbJ-drJOxVi6jLx5NjO0f8uTzYrDuz-CXbJ_v1fT_8u0Z2abZCLhuKZQd3PXWnT/exec";
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbxKw-6unh4VyljNLIfsc6Te3rJjqdJZZHH7olem-t1skxuGulxtVDZ98r0EPAoqyT2O/exec";
         const UserContext = createContext(null);
 
         async function callAPI(action, data = {}) {
@@ -101,7 +101,7 @@
             return <UserContext.Provider value={{...userProfile}}>{children}</UserContext.Provider>;
         };
 
-        // --- 核心組件 ---
+        // --- 活動管理 (修正版) ---
         const getBatchColor = (b) => { const n = parseInt(String(b).replace(/\D/g, ''))||0; return ['text-red-600','text-blue-600','text-green-600','text-purple-600'][n%4] || 'text-gray-800'; };
 
         const LotteryDrawer = ({ isOpen, activity, onClose, onDataChange }) => {
@@ -196,7 +196,6 @@
             );
         };
 
-        // 🌟 修復後的創建活動彈窗 (Z-index 修正 + 日期選擇器)
         const CreateActivityModal = ({ isOpen, onClose, onSaved }) => {
             const [form, setForm] = useState({ name: '', type: '講座類', courseTime: '', deadline: '', capacity: '20', needMeal: false });
             const [loading, setLoading] = useState(false);
@@ -286,14 +285,49 @@
 
         const Dashboard = () => {
             const [stats, setStats] = useState({ activityCount: '-', assocCount: '-', vendorCount: '-' });
-            useEffect(() => { callAPI('getDashboardSummary').then(res => { if(res.success) setStats(res.stats); }); }, []);
+            const [recentList, setRecentList] = useState([]);
+            
+            useEffect(() => { 
+                callAPI('getDashboardSummary').then(res => { 
+                    if(res.success) {
+                        setStats(res.stats);
+                        setRecentList(res.recentActivities || []);
+                    }
+                }); 
+            }, []);
+
             return (
                 <div className="p-8 fade-in">
                     <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2"><BarChart2 /> 系統概覽</h2>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-3 gap-4 mb-8">
                         <div className="bg-white p-6 rounded-2xl shadow-sm border"><p className="text-gray-400 text-xs font-bold">上架活動</p><h3 className="text-2xl font-black text-green-600">{stats.activityCount}</h3></div>
                         <div className="bg-white p-6 rounded-2xl shadow-sm border"><p className="text-gray-400 text-xs font-bold">協會會員</p><h3 className="text-2xl font-black text-blue-600">{stats.assocCount}</h3></div>
                         <div className="bg-white p-6 rounded-2xl shadow-sm border"><p className="text-gray-400 text-xs font-bold">廠商會員</p><h3 className="text-2xl font-black text-purple-600">{stats.vendorCount}</h3></div>
+                    </div>
+                    
+                    <h3 className="text-lg font-bold text-gray-700 mb-4">🔥 近期熱門活動</h3>
+                    <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-gray-50 border-b">
+                                <tr>
+                                    <th className="p-4">活動名稱</th>
+                                    <th className="p-4 text-center">狀態</th>
+                                    <th className="p-4 text-center">報名</th>
+                                    <th className="p-4 text-center">核銷</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {recentList.length === 0 ? <tr><td colSpan="4" className="p-8 text-center text-gray-400">尚無活動</td></tr> : 
+                                recentList.map((act, idx) => (
+                                    <tr key={idx} className="border-b hover:bg-gray-50">
+                                        <td className="p-4 font-bold">{act['活動名稱']}</td>
+                                        <td className="p-4 text-center"><span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">{act['狀態']}</span></td>
+                                        <td className="p-4 text-center font-bold text-blue-600">{act['報名人數']}</td>
+                                        <td className="p-4 text-center text-gray-500">{act['核銷人數']}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             );
