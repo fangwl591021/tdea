@@ -26,41 +26,29 @@
     <script type="text/babel">
         const { useState, useEffect, useContext, createContext } = React;
         
-        // --- ⚙️ 核心設定區 ---
         const LIFF_ID = "2005868456-cfANNVou"; 
         const GAS_URL = "https://script.google.com/macros/s/AKfycbzY-CJEeIEJob3SJ_XNKV1u-Rv5JdaN56vpZq1o0e9OeUb88hqnEYWaC0FUa6CnudC4/exec";
 
         const UserContext = createContext(null);
 
-        /**
-         * 🌟 API 呼叫函式 (含強制更新參數)
-         */
         async function callAPI(action, data = {}) {
             try {
-                // 加入時間戳記避免 GAS 緩存舊結果
                 const url = `${GAS_URL}?t=${new Date().getTime()}`;
                 const response = await fetch(url, {
                     method: 'POST',
                     body: JSON.stringify({ action, ...data })
                 });
-                const result = await response.json();
-                console.log(`[API LOG] Action: ${action}`, result); // 🔍 除錯用：按 F12 檢查 Console
-                return result;
+                return await response.json();
             } catch (err) {
-                console.error("API Error:", err);
                 return { success: false, message: "連線失敗" };
             }
         }
 
-        // --- Icon 組件 ---
         const IconBase = ({ size = 20, children }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{children}</svg>);
         const BarChart2 = () => (<IconBase><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></IconBase>);
         const Users = () => (<IconBase><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></IconBase>);
         const LogOut = () => (<IconBase><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline></IconBase>);
 
-        /**
-         * 權限驗證守衛
-         */
         const AuthGuard = ({ children }) => {
             const [status, setStatus] = useState("LOADING"); 
             const [userProfile, setUserProfile] = useState(null);
@@ -79,16 +67,11 @@
                         setUserProfile(profile);
                         setRegForm(prev => ({ ...prev, name: profile.displayName }));
                         
-                        // 執行權限檢查
                         const res = await callAPI('check', { userId: profile.userId });
                         
-                        if (res.status === 'ok') {
-                            setStatus("AUTHORIZED");
-                        } else if (res.status === 'pending') {
-                            setStatus("PENDING");
-                        } else {
-                            setStatus("REGISTER");
-                        }
+                        if (res.status === 'ok') setStatus("AUTHORIZED");
+                        else if (res.status === 'pending') setStatus("PENDING");
+                        else setStatus("REGISTER");
                     } catch (err) { setStatus("ERROR"); }
                 };
                 init();
@@ -97,11 +80,7 @@
             const handleRegister = async () => {
                 if (!regForm.name || !regForm.phone) { alert("請填寫姓名與電話"); return; }
                 setRegLoading(true);
-                const res = await callAPI('register', { 
-                    userId: userProfile.userId, 
-                    name: regForm.name, 
-                    phone: regForm.phone 
-                });
+                const res = await callAPI('register', { userId: userProfile.userId, name: regForm.name, phone: regForm.phone });
                 setRegLoading(false);
                 if (res.success) setStatus("PENDING");
                 else alert("註冊失敗: " + res.message);
@@ -109,39 +88,41 @@
 
             if (status === "LOADING") return <div className="h-screen flex items-center justify-center text-gray-400 font-bold">驗證身分中...</div>;
             
-            if (status === "REGISTER") return (
+            if (status === "REGISTER" || status === "PENDING") return (
                 <div className="h-screen flex items-center justify-center bg-gray-50 p-6 fade-in">
                     <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm text-center">
-                        <h2 className="text-2xl font-black mb-2 text-gray-800">申請操作權限</h2>
-                        <p className="text-gray-400 text-sm mb-6">初次登入請填寫申請資料</p>
-                        <div className="space-y-4 text-left">
-                            <div>
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">真實姓名</label>
-                                <input className="w-full border p-3 rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-green-400 font-bold" 
-                                       value={regForm.name} onChange={e => setRegForm({...regForm, name: e.target.value})} />
+                        <h2 className="text-2xl font-black mb-2 text-gray-800">{status === "REGISTER" ? "申請操作權限" : "權限審核中"}</h2>
+                        <p className="text-gray-400 text-sm mb-6">{status === "REGISTER" ? "初次登入請填寫申請資料" : "您的資料已送出，請等待開通。"}</p>
+                        
+                        {status === "REGISTER" && (
+                            <div className="space-y-4 text-left mb-6">
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">真實姓名</label>
+                                    <input className="w-full border p-3 rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-green-400 font-bold" 
+                                           value={regForm.name} onChange={e => setRegForm({...regForm, name: e.target.value})} />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">手機號碼</label>
+                                    <input className="w-full border p-3 rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-green-400 font-bold" 
+                                           placeholder="0912345678" value={regForm.phone} onChange={e => setRegForm({...regForm, phone: e.target.value})} />
+                                </div>
+                                <button onClick={handleRegister} disabled={regLoading} className="w-full bg-[#5cc77a] hover:bg-green-600 text-white py-4 rounded-2xl font-bold shadow-lg transition-all active:scale-95">
+                                    {regLoading ? "傳送中..." : "提交申請"}
+                                </button>
                             </div>
-                            <div>
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">手機號碼</label>
-                                <input className="w-full border p-3 rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-green-400 font-bold" 
-                                       placeholder="0912345678" value={regForm.phone} onChange={e => setRegForm({...regForm, phone: e.target.value})} />
-                            </div>
-                            <button onClick={handleRegister} disabled={regLoading} className="w-full bg-[#5cc77a] hover:bg-green-600 text-white py-4 rounded-2xl font-bold shadow-lg transition-all active:scale-95">
-                                {regLoading ? "傳送中..." : "提交申請"}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            );
+                        )}
 
-            if (status === "PENDING") return (
-                <div className="h-screen flex items-center justify-center p-6 text-center fade-in">
-                    <div className="bg-white p-10 rounded-2xl shadow-xl border-t-8 border-yellow-400">
-                        <div className="text-5xl mb-4">⏳</div>
-                        <h2 className="text-xl font-bold text-gray-800 mb-2">權限審核中</h2>
-                        <p className="text-gray-500 mb-8">您的資料已送出。<br/>請連繫管理員進行開通。</p>
-                        <button onClick={() => window.location.reload()} className="w-full bg-blue-50 text-blue-600 py-3 rounded-xl font-bold hover:bg-blue-100 transition-all">
-                            已開通？點此刷新狀態
-                        </button>
+                        {status === "PENDING" && (
+                             <button onClick={() => window.location.reload()} className="w-full bg-blue-50 text-blue-600 py-3 rounded-xl font-bold hover:bg-blue-100 transition-all mb-4">
+                                已開通？點此刷新狀態
+                            </button>
+                        )}
+
+                        {/* 🌟 偵錯區域：顯示目前的 UserId */}
+                        <div className="mt-4 p-3 bg-gray-100 rounded-lg text-left">
+                            <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">您的專屬 UserId (請填入試算表 A 欄)</p>
+                            <code className="text-[10px] text-blue-600 font-mono break-all">{userProfile?.userId}</code>
+                        </div>
                     </div>
                 </div>
             );
@@ -163,7 +144,7 @@
             return (
                 <div className="p-8 fade-in">
                     <h2 className="text-2xl font-bold text-gray-800 mb-8 flex items-center gap-2"><BarChart2 /> 數據概覽</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
                         <div className="bg-white p-8 rounded-3xl shadow-sm border flex items-center justify-between">
                             <div><p className="text-gray-400 text-xs font-bold mb-1">上架活動</p><h3 className="text-3xl font-black text-green-600">{loading ? '...' : stats.activityCount}</h3></div>
                             <div className="bg-green-50 p-4 rounded-2xl text-green-600"><BarChart2 /></div>
