@@ -21,6 +21,9 @@
         .lottery-screen { position: fixed; inset: 0; background: white; z-index: 200; overflow: auto; display: flex; flex-direction: column; align-items: center; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 150; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
+        .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; transition: opacity 0.3s; }
+        .drawer-content { position: fixed; right: 0; top: 0; bottom: 0; width: 450px; background: white; z-index: 101; box-shadow: -5px 0 20px rgba(0,0,0,0.2); transition: transform 0.3s ease-out; transform: translateX(100%); display: flex; flex-direction: column; }
+        .drawer-open .drawer-content { transform: translateX(0); }
     </style>
 </head>
 <body>
@@ -32,7 +35,6 @@
         const GAS_URL = "https://script.google.com/macros/s/AKfycbwcpE0ZDUwpQStkaDURFIYlliMH3KrJ0x0KhuwQrd6WqSwx5IfUwjGebeaIqnHXYC91/exec";
         const UserContext = createContext(null);
 
-        // --- 核心 API 通訊 ---
         async function callAPI(action, data = {}) {
             try {
                 const url = `${GAS_URL}?t=${new Date().getTime()}`;
@@ -47,12 +49,12 @@
         const ActivityIcon = () => <IconBase><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></IconBase>;
         const LogOut = () => <IconBase><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/></IconBase>;
         const IconPlus = () => <IconBase><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></IconBase>;
+        const ChevronDown = () => <IconBase><polyline points="6 9 12 15 18 9"/></IconBase>;
 
-        // --- 1. 權限驗證組件 ---
+        // --- 1. 權限驗證 ---
         const AuthGuard = ({ children }) => {
             const [status, setStatus] = useState("LOADING"); 
             const [userProfile, setUserProfile] = useState(null);
-
             useEffect(() => {
                 const init = async () => {
                     try {
@@ -68,22 +70,12 @@
                 };
                 init();
             }, []);
-
-            if (status === "LOADING") return <div className="h-screen flex items-center justify-center text-gray-400 font-bold italic">系統載入中...</div>;
-            if (status !== "AUTHORIZED") return (
-                <div className="h-screen flex items-center justify-center bg-gray-50 p-6 text-center">
-                    <div className="bg-white p-12 rounded-[2.5rem] shadow-2xl max-w-sm border-8 border-gray-100">
-                        <h2 className="text-2xl font-black mb-4">存取權限不足</h2>
-                        <p className="text-gray-500 mb-8 font-bold">請聯絡管理員開通操作權限。<br/><span className="text-xs text-blue-400">目前狀態：{status}</span></p>
-                        <button onClick={() => window.location.reload()} className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-black shadow-lg">重新登入</button>
-                    </div>
-                </div>
-            );
+            if (status === "LOADING") return <div className="h-screen flex items-center justify-center text-gray-400 font-bold italic">身份驗證中...</div>;
+            if (status !== "AUTHORIZED") return <div className="h-screen flex items-center justify-center">無權限存取系統 ({status})</div>;
             return <UserContext.Provider value={{...userProfile}}>{children}</UserContext.Provider>;
         };
 
-        // --- 2. 抽獎模組 (滿版 / 置中 / 批次計數) ---
-        const getBatchColor = (b) => { const n = parseInt(String(b).replace(/\D/g, ''))||0; return ['text-red-600','text-blue-600','text-green-600','text-purple-600'][n%4] || 'text-gray-800'; };
+        // --- 2. 抽獎模組 (滿版/置中/樂觀更新) ---
         const LotteryDrawer = ({ isOpen, activity, onClose, onDataChange }) => {
             const [candidates, setCandidates] = useState([]);
             const [winners, setWinners] = useState([]);
@@ -106,28 +98,21 @@
                 if (!prizeName) return alert("請輸入獎項名稱");
                 setDrawing(true);
                 const pool = candidates.filter(p => !p.batch && (!onlyCheckedIn || p.status !== "未簽到"));
-                if (pool.length < drawCount) { setDrawing(false); return alert("可抽獎人數不足！"); }
-                
+                if (pool.length < drawCount) { setDrawing(false); return alert("合格人數不足"); }
+                const nextBatch = `第 ${new Set(winners.map(w => w.batch)).size + 1} 梯`;
                 const selected = [];
                 const poolCopy = [...pool];
                 for(let i=0; i<drawCount; i++) {
                     const idx = Math.floor(Math.random() * poolCopy.length);
                     selected.push(poolCopy.splice(idx, 1)[0]);
                 }
-
-                // 樂觀更新計數器：找出目前已有幾種批次標記
-                const currentBatches = new Set(winners.map(w => String(w.batch).trim()));
-                const nextBatch = `第 ${currentBatches.size + 1} 梯`;
-
-                const newWinnersList = selected.map(w => ({ ...w, batch: nextBatch, prize: prizeName }));
-                setWinners([...newWinnersList, ...winners]);
+                const displayOnes = selected.map(w => ({ ...w, batch: nextBatch, prize: prizeName }));
+                setWinners([...displayOnes, ...winners]);
                 setCandidates(prev => prev.map(p => {
                     const isWin = selected.find(s => s._row === p._row);
                     return isWin ? { ...p, batch: nextBatch, prize: prizeName } : p;
                 }));
                 setDrawing(false);
-
-                // 背景執行 API 存檔
                 await callAPI('saveLotteryResults', { id: activity['活動試算表ID'], winners: selected.map(w=>({row: w._row, prize: prizeName})) });
                 onDataChange();
             };
@@ -136,43 +121,26 @@
             return (
                 <div className="lottery-screen fade-in">
                     <div className="w-full bg-[#fceda2] p-10 text-center shadow-md relative">
-                        <button onClick={onClose} className="absolute top-10 left-10 bg-white px-6 py-2 rounded-xl font-bold shadow text-lg hover:bg-gray-100 transition">← 返回列表</button>
+                        <button onClick={onClose} className="absolute top-10 left-10 bg-white px-6 py-2 rounded-xl font-bold shadow text-lg hover:bg-gray-100 transition">← 返回</button>
                         <h2 className="text-5xl font-black text-red-600 mb-2">幸運抽抽樂</h2>
                         <p className="font-bold text-gray-800 text-2xl tracking-widest">{activity['活動名稱']}</p>
                     </div>
                     <div className="w-full p-8 border-b flex flex-wrap gap-8 items-end justify-center bg-white sticky top-0 z-10 shadow-sm">
                         <div className="text-center"><label className="text-sm font-bold block mb-1 text-gray-400">獎項名稱</label><input className="border-2 p-3 rounded-xl text-2xl w-80 text-center font-bold" value={prizeName} onChange={e => setPrizeName(e.target.value)} /></div>
                         <div className="text-center"><label className="text-sm font-bold block mb-1 text-gray-400">人數</label><input type="number" className="border-2 p-3 rounded-xl text-2xl w-24 text-center font-bold" value={drawCount} onChange={e => setDrawCount(e.target.value)} /></div>
-                        <div className="flex gap-2">
-                            <button onClick={handleDraw} disabled={drawing} className="bg-green-600 text-white px-12 py-3 rounded-xl font-black text-2xl shadow-xl hover:bg-green-700 transition active:scale-95 disabled:opacity-50">開始抽獎</button>
-                            <button onClick={()=>{if(confirm("確定清除紀錄?")) callAPI('clearLotteryData',{id:activity['活動試算表ID']}).then(()=>window.location.reload())}} className="bg-red-500 text-white px-6 py-3 rounded-xl font-bold text-xl shadow hover:bg-red-600">清除紀錄</button>
-                        </div>
+                        <div className="flex gap-2"><button onClick={handleDraw} disabled={drawing} className="bg-green-600 text-white px-12 py-3 rounded-xl font-black text-2xl shadow hover:bg-green-700 transition">開始抽獎</button></div>
                     </div>
-                    <div className="bg-gray-50 w-full py-4 text-center font-bold text-gray-500 border-b">
-                        符合資格：{candidates.filter(p=>!p.batch && (!onlyCheckedIn || p.status!=="未簽到")).length} 人 | <label className="cursor-pointer ml-4"><input type="checkbox" className="w-5 h-5 align-middle" checked={onlyCheckedIn} onChange={e=>setOnlyCheckedIn(e.target.checked)}/> 僅限已簽到</label>
-                    </div>
-                    <div className="w-full p-12 bg-gray-50 flex flex-col items-center">
+                    <div className="flex-1 overflow-auto p-12 bg-gray-50 flex justify-center w-full">
                         <table className="w-[95%] max-w-7xl text-2xl text-center bg-white rounded-3xl shadow-2xl overflow-hidden h-fit mb-20">
-                            <thead className="bg-gray-200 text-gray-700">
-                                <tr><th className="p-6 w-32 border-r">梯次</th><th className="p-6 border-r">獎項</th><th className="p-6 border-r">幸運得主</th><th className="p-6">手機號碼</th></tr>
-                            </thead>
-                            <tbody>
-                                {winners.length === 0 ? <tr><td colSpan="4" className="p-24 text-gray-300 italic font-bold">點擊按鈕抽取幸運兒</td></tr> : winners.map((w, i) => (
-                                    <tr key={i} className="border-b hover:bg-yellow-50 transition-colors">
-                                        <td className={`p-6 font-black text-gray-400 border-r`}>{w.batch.replace(/\D/g,'')}</td>
-                                        <td className="p-6 font-bold text-blue-600 border-r">{w.prize}</td>
-                                        <td className="p-6 font-black text-gray-800 border-r">{w.name}</td>
-                                        <td className="p-6 text-gray-500 font-mono tracking-tighter">{w.phone}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
+                            <thead className="bg-gray-200 text-gray-700"><tr><th className="p-6">梯次</th><th className="p-6">獎項</th><th className="p-6">姓名</th><th className="p-6">電話</th></tr></thead>
+                            <tbody>{winners.map((w, i) => (<tr key={i} className="border-b hover:bg-yellow-50 transition-colors"><td className="p-6 font-black text-gray-400">{String(w.batch).replace(/\D/g,'')}</td><td className="p-6 font-bold text-blue-600">{w.prize}</td><td className="p-6 font-black text-gray-800">{w.name}</td><td className="p-6 text-gray-500 font-mono">{w.phone}</td></tr>))}</tbody>
                         </table>
                     </div>
                 </div>
             );
         };
 
-        // --- 3. 活動明細展開 (DetailsRow) ---
+        // --- 3. 明細與核銷 (DetailsRow) ---
         const DetailsRow = ({ activity, onClose }) => {
             const [data, setData] = useState([]);
             const [loading, setLoading] = useState(true);
@@ -182,32 +150,32 @@
                 callAPI('getActivityDetails', { id: activity['活動試算表ID'] }).then(res => { setData(res || []); setLoading(false); });
             };
             useEffect(() => { fetchList(); }, []);
-            const handleAction = async (r) => {
+            const handleToggle = async (r) => {
                 const res = await callAPI('toggleCheckInStatus', { id: activity['活動試算表ID'], row: r._row, status: r.核銷狀態 });
                 if(res.success) fetchList();
             };
             const filtered = data.filter(i => (i.姓名 || "").includes(search) || (i.電話 || "").includes(search));
             return (
-                <tr className="bg-gray-100/50">
+                <tr className="bg-gray-50">
                     <td colSpan="6" className="p-8">
-                        <div className="bg-white rounded-3xl border-2 border-blue-100 shadow-xl p-8">
-                            <div className="flex justify-between mb-8 items-center border-b pb-4">
-                                <h3 className="font-bold text-2xl text-gray-800">📂 報名明細：{activity['活動名稱']}</h3>
+                        <div className="bg-white rounded-3xl border-2 border-blue-50 shadow-inner p-8">
+                            <div className="flex justify-between mb-6 items-center">
+                                <h3 className="font-bold text-xl text-gray-800">📂 簽到管理：{activity['活動名稱']}</h3>
                                 <div className="flex gap-4">
-                                    <input placeholder="搜尋姓名/手機..." className="border-2 p-3 rounded-2xl text-sm w-72 focus:border-blue-400 outline-none shadow-sm" value={search} onChange={e=>setSearch(e.target.value)} />
-                                    <button onClick={fetchList} className="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold shadow-lg active:scale-95 transition">刷新</button>
-                                    <button onClick={onClose} className="bg-gray-400 text-white px-6 py-2 rounded-xl font-bold shadow-lg active:scale-95 transition">關閉</button>
+                                    <input placeholder="搜尋姓名/電話..." className="border-2 p-2 rounded-xl text-sm w-64" value={search} onChange={e=>setSearch(e.target.value)} />
+                                    <button onClick={fetchList} className="bg-blue-50 text-blue-600 px-4 py-2 rounded-xl font-bold">刷新</button>
+                                    <button onClick={onClose} className="bg-gray-100 px-4 py-2 rounded-xl font-bold text-gray-400">收起</button>
                                 </div>
                             </div>
-                            {loading ? <div className="p-20 text-center text-gray-300 font-bold italic animate-pulse">正在載入簽到名單...</div> : (
+                            {loading ? <div className="p-10 text-center text-gray-300">資料讀取中...</div> : (
                                 <table className="w-full text-center">
-                                    <thead className="bg-gray-50 border-b"><tr><th className="p-3">姓名</th><th className="p-3">電話</th><th className="p-3">核銷狀態</th><th className="p-3">動作</th></tr></thead>
+                                    <thead className="bg-gray-50 border-b"><tr><th>姓名</th><th>電話</th><th>狀態</th><th>動作</th></tr></thead>
                                     <tbody>
-                                        {filtered.length === 0 ? <tr><td colSpan="4" className="p-10 text-gray-400 italic">尚無符合搜尋結果的報名者</td></tr> : filtered.map((r, idx) => (
-                                            <tr key={idx} className="border-b hover:bg-gray-50 transition-colors">
-                                                <td className="p-4 font-black text-gray-700">{r.姓名}</td><td className="p-4 font-mono">{r.電話}</td>
-                                                <td className="p-4">{r.核銷狀態 === "未簽到" ? <span className="text-red-400 font-bold bg-red-50 px-4 py-1.5 rounded-full text-xs">未簽到</span> : <span className="text-green-600 font-bold bg-green-50 px-4 py-1.5 rounded-full text-xs border border-green-200">{r.核銷狀態}</span>}</td>
-                                                <td className="p-4"><button onClick={()=>handleAction(r)} className={`px-8 py-2 rounded-2xl text-white font-bold text-sm shadow-md transition active:scale-90 ${r.核銷狀態 === "未簽到" ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-400 hover:bg-gray-500'}`}>{r.核銷狀態 === "未簽到" ? "簽到" : "取消"}</button></td>
+                                        {filtered.map((r, idx) => (
+                                            <tr key={idx} className="border-b">
+                                                <td className="p-4 font-bold">{r.姓名}</td><td className="p-4 font-mono">{r.電話}</td>
+                                                <td className="p-4">{r.核銷狀態 === "未簽到" ? <span className="text-red-400 font-bold">未簽到</span> : <span className="text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded border">{r.核銷狀態}</span>}</td>
+                                                <td className="p-4"><button onClick={()=>handleToggle(r)} className={`px-6 py-2 rounded-xl text-white font-bold text-sm ${r.核銷狀態 === "未簽到" ? 'bg-blue-500' : 'bg-gray-400'}`}>{r.核銷狀態 === "未簽到" ? "核銷" : "取消"}</button></td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -219,96 +187,85 @@
             );
         };
 
-        // --- 4. 分類重新選擇視窗 ---
+        // --- 4. 分類重新選擇 ---
         const ReclassifyModal = ({ isOpen, activity, onClose, onRefresh }) => {
             const [type, setType] = useState("");
-            const [saving, setSaving] = useState(false);
             useEffect(() => { if(activity) setType(activity.活動類型); }, [activity]);
             if (!isOpen || !activity) return null;
             const handleSave = async () => {
-                setSaving(true);
                 await callAPI('updateActivityType', { name: activity.活動名稱, type: type });
-                setSaving(false); onRefresh(); onClose();
+                onRefresh(); onClose();
             };
             return (
                 <div className="modal-overlay">
                     <div className="bg-white p-12 rounded-[3rem] shadow-2xl w-full max-w-sm text-center relative border-8 border-gray-50">
-                        <h3 className="text-2xl font-black mb-2 tracking-tighter">🏷️ 重新分類活動</h3>
-                        <p className="text-gray-400 mb-8 font-bold italic">{activity.活動名稱}</p>
-                        <select className="w-full border-2 p-5 rounded-3xl mb-12 bg-gray-50 font-black text-2xl text-center focus:border-purple-400 outline-none appearance-none cursor-pointer shadow-inner" value={type} onChange={e=>setType(e.target.value)}>
+                        <h3 className="text-2xl font-black mb-6">🏷️ 修改活動分類</h3>
+                        <p className="text-gray-400 mb-6 font-bold">{activity.活動名稱}</p>
+                        <select className="w-full border-2 p-4 rounded-2xl mb-8 bg-gray-50 font-black text-xl text-center" value={type} onChange={e=>setType(e.target.value)}>
                             <option>講座類</option><option>教學類</option><option>聯誼類</option><option>其他</option>
                         </select>
                         <div className="flex gap-4">
-                            <button onClick={onClose} className="flex-1 border-2 py-4 rounded-2xl font-bold text-gray-500">取消</button>
-                            <button onClick={handleSave} disabled={saving} className="flex-[2] bg-purple-600 text-white py-4 rounded-2xl font-bold shadow-xl active:scale-95 transition">{saving?"處理中...":"確認修改"}</button>
+                            <button onClick={onClose} className="flex-1 border-2 py-4 rounded-2xl font-bold">取消</button>
+                            <button onClick={handleSave} className="flex-[2] bg-purple-600 text-white py-4 rounded-2xl font-bold shadow-xl">確認</button>
                         </div>
                     </div>
                 </div>
             );
         };
 
-        // --- 5. 系統儀表板 (Dashboard) ---
+        // --- 5. 系統總覽 (修復數字不對問題) ---
         const Dashboard = ({ allData }) => {
             return (
                 <div className="p-8 fade-in">
-                    <h2 className="text-3xl font-black text-gray-800 mb-10 flex items-center gap-4"><BarChart2 /> 數據即時監控中心</h2>
+                    <h2 className="text-3xl font-black text-gray-800 mb-10 flex items-center gap-4"><BarChart2 /> 系統數據總覽</h2>
                     <div className="grid grid-cols-3 gap-8 mb-16">
-                        <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border-2 border-green-50"><p className="text-gray-400 text-xs font-bold uppercase mb-2 tracking-widest text-center">進行中活動</p><h3 className="text-6xl font-black text-green-600 text-center">{allData.length}</h3></div>
-                        <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border-2 border-blue-50"><p className="text-gray-400 text-xs font-bold uppercase mb-2 tracking-widest text-center">正式會員數</p><h3 className="text-6xl font-black text-blue-600 text-center">494</h3></div>
-                        <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border-2 border-purple-50"><p className="text-gray-400 text-xs font-bold uppercase mb-2 tracking-widest text-center">廠商贊助單位</p><h3 className="text-6xl font-black text-purple-600 text-center">31</h3></div>
+                        <div className="bg-white p-10 rounded-3xl shadow-sm border-2 border-green-50 text-center"><p className="text-gray-400 text-xs font-bold uppercase mb-2">上架活動</p><h3 className="text-6xl font-black text-green-600">{allData.length}</h3></div>
+                        <div className="bg-white p-10 rounded-3xl shadow-sm border-2 border-blue-50 text-center"><p className="text-gray-400 text-xs font-bold uppercase mb-2">協會會員</p><h3 className="text-6xl font-black text-blue-600">494</h3></div>
+                        <div className="bg-white p-10 rounded-3xl shadow-sm border-2 border-purple-50 text-center"><p className="text-gray-400 text-xs font-bold uppercase mb-2">贊助廠商</p><h3 className="text-6xl font-black text-purple-600">31</h3></div>
                     </div>
-                    <h3 className="text-2xl font-black text-gray-700 mb-6 flex items-center gap-3">🔥 活動狀態即時列表</h3>
-                    <div className="bg-white rounded-[3rem] shadow-2xl border overflow-hidden w-full">
+                    <h3 className="text-2xl font-black text-gray-700 mb-6 flex items-center gap-3">🔥 近期活動列表</h3>
+                    <div className="bg-white rounded-3xl shadow-lg border overflow-hidden w-full mx-auto">
                         <table className="w-full text-sm text-center">
-                            <thead className="bg-gray-50 border-b"><tr><th className="p-6 text-left pl-10">活動名稱</th><th className="p-6">目前狀態</th><th className="p-6">報名總數</th><th className="p-6 text-gray-400">核銷人數</th></tr></thead>
-                            <tbody>
-                                {allData.length === 0 ? <tr><td colSpan="4" className="p-24 text-gray-300 font-bold italic">尚無同步之活動數據</td></tr> : allData.map((act, idx) => (
-                                    <tr key={idx} className="border-b hover:bg-gray-50 transition-colors"><td className="p-6 font-bold text-left pl-10 text-gray-800 text-xl">{act['活動名稱']}</td><td className="p-6"><span className="bg-green-100 text-green-700 px-5 py-1.5 rounded-full text-xs font-black uppercase tracking-tighter">上架中</span></td><td className="p-6 font-black text-blue-600 text-2xl">{act['報名人數']}</td><td className="p-6 text-gray-500 text-xl font-bold">{act['核銷人數']}</td></tr>
-                                ))}
-                            </tbody>
+                            <thead className="bg-gray-50 border-b"><tr><th className="p-6 text-left pl-10">活動名稱</th><th className="p-6">狀態</th><th className="p-6">報名</th><th className="p-6 text-gray-400">核銷</th></tr></thead>
+                            <tbody>{allData.map((act, idx) => (<tr key={idx} className="border-b hover:bg-gray-50"><td className="p-6 font-bold text-left pl-10 text-gray-800 text-lg">{act['活動名稱']}</td><td className="p-6"><span className="bg-green-50 text-green-600 px-4 py-1 rounded-full text-[10px] font-black uppercase">上架中</span></td><td className="p-6 font-black text-blue-600 text-2xl">{act['報名人數']}</td><td className="p-6 text-gray-500 text-xl">{act['核銷人數']}</td></tr>))}</tbody>
                         </table>
                     </div>
                 </div>
             );
         };
 
-        // --- 6. 活動管理控制台 ---
+        // --- 6. 活動管理 (修正按鈕寬度與日期) ---
         const ActivityManagementModule = ({ list, onRefresh }) => {
             const [expandedRow, setExpandedRow] = useState(null);
             const [lotTarget, setLotTarget] = useState(null);
             const [reTarget, setReTarget] = useState(null);
-
             return (
                 <div className="p-6 fade-in">
                     <LotteryDrawer isOpen={!!lotTarget} activity={lotTarget} onClose={()=>setLotTarget(null)} onDataChange={onRefresh} />
                     <ReclassifyModal isOpen={!!reTarget} activity={reTarget} onClose={()=>setReTarget(null)} onRefresh={onRefresh} />
-                    
-                    <div className="flex justify-between mb-10 items-center"><h2 className="text-3xl font-black text-gray-800 tracking-tighter uppercase italic">Control Panel v11.2</h2><button onClick={onRefresh} className="bg-blue-600 text-white px-10 py-3 rounded-2xl font-black shadow-2xl active:scale-95 transition flex gap-3 items-center"><span>🔄</span> 刷新遠端數據</button></div>
-                    
-                    <div className="bg-white rounded-[2.5rem] shadow-2xl border-4 border-white overflow-hidden">
+                    <div className="flex justify-between mb-10 items-center"><h2 className="text-3xl font-black text-gray-800 tracking-tighter uppercase italic">Control Panel</h2><button onClick={onRefresh} className="bg-blue-600 text-white px-8 py-2 rounded-2xl font-black shadow-xl">刷新數據</button></div>
+                    <div className="bg-white rounded-[2rem] shadow-2xl border overflow-hidden">
                         <table className="w-full text-center">
-                            <thead className="bg-gray-100 border-b"><tr><th className="p-6 text-left pl-12">名稱 / 時程 / 類型</th><th className="p-4 w-20">報名</th><th className="p-4 w-20">核銷</th><th className="p-4 w-24 border-r">狀態</th><th className="p-4 min-w-[580px]">維護操作區 (5功能鈕)</th></tr></thead>
+                            <thead className="bg-gray-100 border-b"><tr><th className="p-6 text-left pl-10">名稱 / 時程 / 類型</th><th className="p-4 w-20">報名</th><th className="p-4 w-20">核銷</th><th className="p-4 w-24 border-r">狀態</th><th className="p-4 min-w-[550px]">功能操作</th></tr></thead>
                             <tbody>
-                                {list.length === 0 ? <tr><td colSpan="5" className="p-32 text-gray-300 font-black italic">正在從後端伺服器取得列表數據...</td></tr> : list.map((act, i) => (
+                                {list.map((act, i) => (
                                     <Fragment key={i}>
                                         <tr className={`border-b hover:bg-gray-50 transition-all ${expandedRow === act._row ? 'bg-blue-50/50' : ''}`}>
-                                            <td className="p-6 text-left pl-12">
-                                                <div className="font-black text-gray-800 text-xl mb-0.5">{act['活動名稱']}</div>
-                                                <div className="flex items-center gap-3">
-                                                    <span className="text-[10px] text-white bg-gray-400 px-2 py-0.5 rounded font-black uppercase tracking-widest">{act['活動類型']}</span>
-                                                    <span className="text-[11px] text-purple-500 font-black italic">📅 {act['課程時間']} ~ {act['截止日期']}</span>
-                                                </div>
+                                            <td className="p-6 text-left pl-10">
+                                                <div className="font-black text-gray-800 text-xl">{act['活動名稱']}</div>
+                                                <div className="mt-1 text-[11px] text-purple-600 font-bold">📅 起迄：{act['課程時間']} ~ {act['截止日期']}</div>
+                                                <div className="mt-1 text-[10px] text-gray-400 font-bold uppercase tracking-widest">{act['活動類型']}</div>
                                             </td>
                                             <td className="p-4 font-black text-blue-600 text-2xl">{act['報名人數']}</td>
-                                            <td className="p-4 text-gray-400 text-xl font-bold">{act['核銷人數']}</td>
-                                            <td className="p-4 border-r"><span className="bg-green-100 text-green-700 px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-tighter">ONLINE</span></td>
-                                            <td className="p-4 whitespace-nowrap text-right pr-12">
+                                            <td className="p-4 text-gray-400 text-xl">{act['核銷人數']}</td>
+                                            <td className="p-4 border-r"><span className="bg-green-100 text-green-700 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-tighter">{act['狀態']}</span></td>
+                                            <td className="p-4 whitespace-nowrap text-right pr-10">
                                                 <div className="flex gap-2 justify-end">
-                                                    <a href={act['報名前端網址']} target="_blank" className="bg-emerald-500 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-lg hover:bg-emerald-600 transition active:scale-90">網址</a>
-                                                    <button onClick={()=>setExpandedRow(expandedRow === act._row ? null : act._row)} className="bg-blue-500 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-lg hover:bg-blue-600 transition active:scale-90">明細</button>
-                                                    <button onClick={()=>setReTarget(act)} className="bg-purple-500 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-lg hover:bg-purple-600 transition active:scale-90">分類</button>
-                                                    <button onClick={()=>setLotTarget(act)} className="bg-amber-500 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-lg hover:bg-amber-600 transition active:scale-90">抽獎</button>
-                                                    <button onClick={()=>{if(confirm('確定下架活動?')) callAPI('updateActivityStatus',{name:act['活動名稱'],status:'下架'}).then(onRefresh)}} className="bg-rose-500 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-lg hover:bg-rose-600 transition active:scale-90">下架</button>
+                                                    <a href={act['報名前端網址']} target="_blank" className="bg-green-500 text-white px-5 py-2 rounded-xl font-bold text-xs shadow hover:bg-green-600">網址</a>
+                                                    <button onClick={()=>setExpandedRow(expandedRow === act._row ? null : act._row)} className="bg-blue-500 text-white px-5 py-2 rounded-xl font-bold text-xs shadow hover:bg-blue-600">明細</button>
+                                                    <button onClick={()=>setReTarget(act)} className="bg-purple-500 text-white px-5 py-2 rounded-xl font-bold text-xs shadow hover:bg-purple-600">分類</button>
+                                                    <button onClick={()=>setLotTarget(act)} className="bg-yellow-500 text-white px-5 py-2 rounded-xl font-bold text-xs shadow hover:bg-yellow-600">抽獎</button>
+                                                    <button onClick={()=>{if(confirm('確定下架?')) callAPI('updateActivityStatus',{name:act['活動名稱'],status:'下架'}).then(onRefresh)}} className="bg-red-500 text-white px-5 py-2 rounded-xl font-bold text-xs shadow hover:bg-red-600">下架</button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -322,27 +279,101 @@
             );
         };
 
-        // --- 7. 主應用架構 ---
+        // --- 7. 會員名冊編輯抽屜 ---
+        const EditDrawer = ({ isOpen, onClose, item, sheetName, onSaved }) => {
+            const [formData, setFormData] = useState({});
+            const [isSaving, setIsSaving] = useState(false);
+            useEffect(() => { if (item) setFormData({...item}); }, [item]);
+            const handleSave = async () => {
+                setIsSaving(true);
+                await callAPI('updateMemberData', { sheetName, row: formData._row, data: formData });
+                setIsSaving(false); onSaved(); onClose();
+            };
+            const fields = sheetName.includes("本業") ? ["身分", "姓名", "資格", "備註"] : ["公司名稱", "統編", "負責人", "資格", "備註"];
+            if(!isOpen) return null;
+            return (
+                <div className="drawer-overlay" onClick={onClose}>
+                    <div className="drawer-content p-8" onClick={e=>e.stopPropagation()}>
+                        <h3 className="text-2xl font-black mb-8">✏️ 編輯資料</h3>
+                        <div className="space-y-6 flex-1 overflow-auto">
+                            {fields.map(f => (
+                                <div key={f}>
+                                    <label className="text-xs font-bold text-gray-400 block mb-2">{f}</label>
+                                    {f === "備註" ? <textarea className="w-full border-2 p-3 rounded-xl bg-gray-50 h-48" value={formData[f]||""} onChange={e=>setFormData({...formData, [f]:e.target.value})}/> :
+                                     f === "資格" ? <select className="w-full border-2 p-3 rounded-xl bg-gray-50 font-bold" value={formData[f]||""} onChange={e=>setFormData({...formData, [f]:e.target.value})}><option value="">請選擇</option><option value="Y">Y</option><option value="N">N</option></select> :
+                                     <input className="w-full border-2 p-3 rounded-xl bg-gray-50 font-bold" value={formData[f]||""} onChange={e=>setFormData({...formData, [f]:e.target.value})}/>}
+                                </div>
+                            ))}
+                        </div>
+                        <div className="mt-8 flex gap-4 border-t pt-8">
+                            <button onClick={onClose} className="flex-1 border-2 py-4 rounded-2xl font-bold">取消</button>
+                            <button onClick={handleSave} disabled={isSaving} className="flex-[2] bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-xl">{isSaving?"儲存中...":"確認存檔"}</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const MemberTable = ({ title, sheetName }) => {
+            const [data, setData] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [search, setSearch] = useState("");
+            const [editing, setEditing] = useState(null);
+            const fetchData = () => { setLoading(true); callAPI('getMemberData', { sheetName }).then(res => { setData(res.data || []); setLoading(false); }); };
+            useEffect(() => fetchData(), [sheetName]);
+            const filtered = data.filter(d => Object.values(d).some(v => String(v).includes(search)));
+            const cols = sheetName.includes("本業") ? [{k:["會員編號","編號"],l:"編號"},{k:["身分"],l:"身分"},{k:["姓名"],l:"姓名"},{k:["資格"],l:"資格"},{k:["報名次數"],l:"報名"}] :
+                                                      [{k:["編號"],l:"編號"},{k:["公司名稱","公司"],l:"公司"},{k:["統編"],l:"統編"},{k:["負責人"],l:"負責人"},{k:["資格"],l:"資格"}];
+            const gv = (item, keys) => { const k = Object.keys(item).find(key => keys.some(s => key.includes(s))); return k ? item[k] : ""; };
+            return (
+                <div className="p-8 fade-in">
+                    <EditDrawer isOpen={!!editing} item={editing} sheetName={sheetName} onClose={()=>setEditing(null)} onSaved={fetchData} />
+                    <div className="flex justify-between mb-8 items-center"><h2 className="text-3xl font-black">{title}</h2><div className="flex gap-2"><input placeholder="搜尋..." className="border p-2 rounded-xl w-64 shadow-sm" value={search} onChange={e=>setSearch(e.target.value)}/><button onClick={fetchData} className="bg-white border p-2 rounded-xl font-bold shadow">刷新</button></div></div>
+                    <div className="bg-white rounded-3xl shadow-xl border overflow-hidden"><table className="w-full text-sm text-center"><thead className="bg-gray-50 border-b"><tr>{cols.map((c,i)=><th key={i}>{c.l}</th>)}<th>操作</th></tr></thead>
+                    <tbody>{loading ? <tr><td colSpan={cols.length+1} className="p-20 text-gray-400">讀取中...</td></tr> : filtered.map((item, idx) => (<tr key={idx} className="border-b hover:bg-gray-50">{cols.map((c,ci)=><td key={ci}>{gv(item, c.k)}</td>)}<td className="p-4"><button onClick={()=>setEditing(item)} className="bg-blue-500 text-white px-3 py-1 rounded-lg text-xs font-bold shadow">編輯</button></td></tr>))}</tbody></table></div>
+                </div>
+            );
+        };
+
+        // --- 8. 主應用導覽與架構 ---
         const App = () => {
             const [view, setView] = useState('dashboard');
             const [activityData, setActivityData] = useState([]);
+            const [expandedMenu, setExpandedMenu] = useState(false); // 控制名冊摺疊
+            const user = useContext(UserContext);
             const fetchActivities = () => { callAPI('getActivityList').then(res => setActivityData(res.data || [])); };
             useEffect(() => { fetchActivities(); }, []);
 
             return (
                 <AuthGuard>
                     <div className="flex h-screen overflow-hidden">
-                        <div className="w-80 sidebar-bg text-gray-300 flex flex-col shrink-0 shadow-2xl">
-                            <div className="p-12 border-b border-gray-700 text-[#4ade80] text-4xl font-black text-center italic tracking-tighter uppercase leading-none">TDEA<br/><span className="text-xs tracking-normal font-bold opacity-50 not-italic">HUB v11.2</span></div>
-                            <nav className="flex-1 mt-10 space-y-2">
-                                <div className={`px-10 py-6 cursor-pointer flex items-center gap-5 transition-all ${view==='dashboard'?'active-item':'menu-item'}`} onClick={()=>setView('dashboard')}><BarChart2/><span>數據監控總覽</span></div>
-                                <div className={`px-10 py-6 cursor-pointer flex items-center gap-5 transition-all ${view==='activity'?'active-item':'menu-item'}`} onClick={()=>setView('activity')}><ActivityIcon/><span>活動控制控制台</span></div>
+                        <div className="w-72 sidebar-bg text-gray-300 flex flex-col shrink-0 shadow-2xl transition-all">
+                            <div className="p-10 border-b border-gray-700 text-[#4ade80] text-3xl font-black text-center italic tracking-widest uppercase">TDEA Hub</div>
+                            <nav className="flex-1 mt-8 space-y-1">
+                                <div className={`px-8 py-5 cursor-pointer flex items-center gap-4 transition-all ${view==='dashboard'?'active-item':'menu-item'}`} onClick={()=>setView('dashboard')}><BarChart2/><span>系統總覽</span></div>
+                                <div className={`px-8 py-5 cursor-pointer flex items-center gap-4 transition-all ${view==='activity'?'active-item':'menu-item'}`} onClick={()=>setView('activity')}><ActivityIcon/><span>活動管理控制台</span></div>
+                                
+                                {/* 🌟 會員資料管理 (重新加入選單) */}
+                                <div>
+                                    <div className={`px-8 py-5 cursor-pointer flex items-center justify-between menu-item transition-all`} onClick={() => setExpandedMenu(!expandedMenu)}>
+                                        <div className="flex items-center gap-4"><Users/><span>會員資料管理</span></div>
+                                        <div className={`transition-transform ${expandedMenu ? 'rotate-180' : ''}`}><ChevronDown/></div>
+                                    </div>
+                                    {expandedMenu && (
+                                        <div className="bg-[#24292f] transition-all overflow-hidden animate-in fade-in duration-300">
+                                            <div onClick={() => setView('assoc')} className={`px-16 py-4 cursor-pointer text-sm font-bold border-l-4 transition-all ${view==='assoc' ? 'text-green-400 border-green-400 bg-[#243b32]' : 'border-transparent text-gray-500 hover:text-white'}`}>協會名冊</div>
+                                            <div onClick={() => setView('vendor')} className={`px-16 py-4 cursor-pointer text-sm font-bold border-l-4 transition-all ${view==='vendor' ? 'text-green-400 border-green-400 bg-[#243b32]' : 'border-transparent text-gray-500 hover:text-white'}`}>廠商名冊</div>
+                                        </div>
+                                    )}
+                                </div>
                             </nav>
-                            <div className="border-t border-gray-700 bg-[#22272e] p-10 text-center"><button onClick={()=>liff.logout()||window.location.reload()} className="w-full bg-gray-700 hover:bg-rose-600 text-white py-4 rounded-[2rem] font-black text-sm shadow-2xl transition-all uppercase tracking-widest active:scale-95">安全登出系統</button></div>
+                            <div className="border-t border-gray-700 bg-[#22272e] p-8 text-center"><button onClick={()=>window.location.reload()} className="w-full bg-gray-700 hover:bg-rose-600 text-white py-4 rounded-3xl font-black text-xs shadow-2xl transition-all uppercase tracking-widest">系統重新啟動</button></div>
                         </div>
                         <main className="flex-1 overflow-auto bg-[#f8fafc] no-scrollbar">
                             {view==='dashboard' && <Dashboard allData={activityData} />}
                             {view==='activity' && <ActivityManagementModule list={activityData} onRefresh={fetchActivities} />}
+                            {view==='assoc' && <MemberTable title="協會正式會員名冊" sheetName="本業會員" />}
+                            {view==='vendor' && <MemberTable title="廠商贊助單位名冊" sheetName="廠商會員" />}
                         </main>
                     </div>
                 </AuthGuard>
