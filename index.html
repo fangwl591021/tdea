@@ -3,125 +3,134 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TDEA 管理中心 - GitHub 版</title>
+    <title>TDEA 管理中心</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-
     <style>
         body { background-color: #f3f4f6; font-family: "Microsoft JhengHei", sans-serif; }
         .sidebar-bg { background-color: #2d333b; }
         .active-item { background-color: #243b32; border-left: 4px solid #4ade80; color: #4ade80; }
         .menu-item:hover:not(.active-item) { background-color: #3d444d; }
-        table th { text-align: center !important; white-space: nowrap; font-size: 12px; font-weight: 800; color: #6b7280; text-transform: uppercase; }
-        table td { text-align: center !important; white-space: nowrap; font-size: 13px; padding: 12px 8px; }
-        .fade-in { animation: fadeIn 0.5s ease-out; }
+        table th { text-align: center !important; white-space: nowrap; font-size: 12px; font-weight: 800; color: #6b7280; }
+        table td { text-align: center !important; font-size: 13px; padding: 12px 8px; }
+        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useContext, createContext, Fragment } = React;
+        const { useState, useEffect, useContext, createContext } = React;
         
-        // --- 設定區 ---
         const LIFF_ID = "2005868456-cfANNVou"; 
         const GAS_URL = "https://script.google.com/macros/s/AKfycbzY-CJEeIEJob3SJ_XNKV1u-Rv5JdaN56vpZq1o0e9OeUb88hqnEYWaC0FUa6CnudC4/exec";
+
         const UserContext = createContext(null);
 
-        /**
-         * 統一通訊函式 (取代 google.script.run)
-         */
         async function callAPI(action, data = {}) {
-            const response = await fetch(GAS_URL, {
-                method: 'POST',
-                mode: 'cors',
-                body: JSON.stringify({ action, ...data })
-            });
-            return await response.json();
+            try {
+                const url = `${GAS_URL}?t=${new Date().getTime()}`;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    body: JSON.stringify({ action, ...data })
+                });
+                return await response.json();
+            } catch (err) {
+                return { success: false, message: "連線失敗" };
+            }
         }
 
-        // --- Icon 組件 ---
         const IconBase = ({ size = 20, children }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{children}</svg>);
         const BarChart2 = () => (<IconBase><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></IconBase>);
         const Users = () => (<IconBase><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></IconBase>);
-        const Activity = () => (<IconBase><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></IconBase>);
         const LogOut = () => (<IconBase><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline></IconBase>);
 
         const AuthGuard = ({ children }) => {
             const [status, setStatus] = useState("LOADING"); 
             const [userProfile, setUserProfile] = useState(null);
             const [regForm, setRegForm] = useState({ name: '', phone: '' });
+            const [regLoading, setRegLoading] = useState(false);
 
             useEffect(() => {
                 const init = async () => {
                     try {
                         await liff.init({ liffId: LIFF_ID });
                         if (!liff.isLoggedIn()) {
-                            setStatus("LOGIN_REQUIRED");
+                            liff.login();
+                            return;
+                        }
+                        const profile = await liff.getProfile();
+                        setUserProfile(profile);
+                        setRegForm(prev => ({ ...prev, name: profile.displayName }));
+                        
+                        const res = await callAPI('check', { userId: profile.userId });
+                        
+                        if (res.status === 'ok') {
+                            setStatus("AUTHORIZED");
+                        } else if (res.status === 'pending' || res.status === 'forbidden') {
+                            setStatus("PENDING");
                         } else {
-                            const profile = await liff.getProfile();
-                            setUserProfile(profile);
-                            setRegForm(prev => ({ ...prev, name: profile.displayName }));
-                            const res = await callAPI('check', { userId: profile.userId });
-                            if (res.status === 'ok') setStatus("AUTHORIZED");
-                            else if (res.status === 'new') setStatus("REGISTER");
-                            else setStatus("PENDING");
+                            setStatus("REGISTER");
                         }
                     } catch (err) { setStatus("ERROR"); }
                 };
                 init();
             }, []);
 
-            if (status === "LOADING") return <div className="h-screen flex items-center justify-center text-gray-400">驗證中...</div>;
+            const handleRegister = async () => {
+                if (!regForm.name || !regForm.phone) { alert("請填寫姓名與電話"); return; }
+                setRegLoading(true);
+                const res = await callAPI('register', { userId: userProfile.userId, name: regForm.name, phone: regForm.phone });
+                setRegLoading(false);
+                if (res.success) setStatus("PENDING");
+                else alert("註冊失敗: " + res.message);
+            };
+
+            if (status === "LOADING") return <div className="h-screen flex items-center justify-center text-gray-400 font-bold">驗證身分中...</div>;
             
-            if (status === "LOGIN_REQUIRED") return (
-                <div className="h-screen flex items-center justify-center bg-gray-100 p-6">
-                    <div className="bg-white p-10 rounded-3xl shadow-2xl w-full max-w-sm text-center">
-                        <h2 className="text-2xl font-black mb-6">管理中心登入</h2>
-                        <a href={`https://liff.line.me/${LIFF_ID}`} target="_top" className="block w-full bg-[#06c755] text-white py-4 rounded-2xl font-bold">LINE 登入</a>
+            if (status === "REGISTER" || status === "PENDING") return (
+                <div className="h-screen flex items-center justify-center bg-gray-50 p-6 fade-in">
+                    <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm text-center">
+                        <h2 className="text-2xl font-black mb-2 text-gray-800">{status === "REGISTER" ? "申請操作權限" : "權限審核中"}</h2>
+                        <div className="mt-4 p-3 bg-gray-100 rounded-lg text-left">
+                            <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">您的專屬 UserId</p>
+                            <code className="text-[10px] text-blue-600 font-mono break-all">{userProfile?.userId}</code>
+                        </div>
+                        {status === "REGISTER" ? (
+                            <button onClick={handleRegister} disabled={regLoading} className="w-full mt-6 bg-[#5cc77a] hover:bg-green-600 text-white py-4 rounded-2xl font-bold shadow-lg">提交申請</button>
+                        ) : (
+                            <button onClick={() => window.location.reload()} className="w-full mt-6 bg-blue-50 text-blue-600 py-3 rounded-xl font-bold">已開通？點此刷新</button>
+                        )}
                     </div>
                 </div>
             );
 
-            if (status === "REGISTER" || status === "PENDING") {
-                return <div className="h-screen flex items-center justify-center p-6 text-center">
-                    <div className="bg-white p-8 rounded-2xl shadow-xl">
-                        <h2 className="text-xl font-bold mb-4">{status === "REGISTER" ? "申請權限" : "審核中"}</h2>
-                        <p className="text-gray-500 mb-6">請聯繫管理員開通權限後刷新頁面。</p>
-                        <button onClick={() => window.location.reload()} className="text-blue-500 underline font-bold">重新整理</button>
-                    </div>
-                </div>;
-            }
-
-            return <UserContext.Provider value={userProfile}>{children}</UserContext.Provider>;
+            return <UserContext.Provider value={{...userProfile}}>{children}</UserContext.Provider>;
         };
 
         const Dashboard = () => {
             const [stats, setStats] = useState({ activityCount: 0, assocCount: 0, vendorCount: 0 });
             const [loading, setLoading] = useState(true);
-
             useEffect(() => {
                 callAPI('getDashboardSummary').then(res => {
                     if (res.success) setStats(res.stats);
                     setLoading(false);
                 });
             }, []);
-
             return (
                 <div className="p-8 fade-in">
                     <h2 className="text-2xl font-bold text-gray-800 mb-8 flex items-center gap-2"><BarChart2 /> 數據概覽</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex items-center justify-between">
-                            <div><p className="text-gray-400 text-xs font-bold mb-1">Activities</p><h3 className="text-3xl font-black text-green-600">{loading ? '...' : stats.activityCount}</h3></div>
-                            <div className="bg-green-50 p-4 rounded-2xl text-green-600"><Activity /></div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+                        <div className="bg-white p-8 rounded-3xl shadow-sm border flex items-center justify-between">
+                            <div><p className="text-gray-400 text-xs font-bold mb-1">上架活動</p><h3 className="text-3xl font-black text-green-600">{loading ? '...' : stats.activityCount}</h3></div>
+                            <div className="bg-green-50 p-4 rounded-2xl text-green-600"><BarChart2 /></div>
                         </div>
-                        <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex items-center justify-between">
-                            <div><p className="text-gray-400 text-xs font-bold mb-1">Associations</p><h3 className="text-3xl font-black text-blue-600">{loading ? '...' : stats.assocCount}</h3></div>
+                        <div className="bg-white p-8 rounded-3xl shadow-sm border flex items-center justify-between">
+                            <div><p className="text-gray-400 text-xs font-bold mb-1">協會會員</p><h3 className="text-3xl font-black text-blue-600">{loading ? '...' : stats.assocCount}</h3></div>
                             <div className="bg-blue-50 p-4 rounded-2xl text-blue-600"><Users /></div>
                         </div>
                     </div>
@@ -132,7 +141,6 @@
         const MemberTable = ({ title, sheetName }) => {
             const [data, setData] = useState([]);
             const [loading, setLoading] = useState(true);
-
             useEffect(() => {
                 setLoading(true);
                 callAPI('getMemberData', { sheetName }).then(res => {
@@ -140,25 +148,24 @@
                     setLoading(false);
                 });
             }, [sheetName]);
-
             return (
                 <div className="p-8 fade-in">
                     <h2 className="text-2xl font-black text-gray-800 mb-8">{title}</h2>
-                    <div className="bg-white rounded-3xl shadow-sm border overflow-hidden">
+                    <div className="bg-white rounded-3xl shadow-sm border overflow-hidden overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead className="bg-gray-50 border-b">
                                 <tr>
                                     <th className="p-5 border-r">編號</th>
-                                    <th className="p-5 border-r">姓名/公司</th>
+                                    <th className="p-5 border-r text-left">姓名/公司</th>
                                     <th className="p-5 text-center bg-blue-50 text-blue-600">累計報名</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
-                                {loading ? <tr><td colSpan="3" className="p-16 text-center text-gray-400">載入中...</td></tr> : 
+                                {loading ? <tr><td colSpan="3" className="p-16 text-center text-gray-400 italic">資料載入中...</td></tr> : 
                                 data.map((item, idx) => (
                                     <tr key={idx} className="hover:bg-gray-50 transition-colors">
                                         <td className="p-5 border-r font-mono text-blue-600 font-bold text-center">{item["編號"] || item["會員編號"]}</td>
-                                        <td className="p-5 border-r font-bold text-gray-700">{item["姓名"] || item["公司"]}</td>
+                                        <td className="p-5 border-r font-bold text-gray-700">{item["姓名"] || item["公司"] || item["廠商"]}</td>
                                         <td className="p-5 text-center font-black text-blue-600">{item["報名次數"] || 0}</td>
                                     </tr>
                                 ))}
@@ -172,7 +179,7 @@
         const App = () => {
             const [view, setView] = useState('dashboard');
             const user = useContext(UserContext);
-
+            const handleLogout = () => { liff.logout(); window.location.reload(); };
             return (
                 <AuthGuard>
                     <div className="flex h-screen overflow-hidden">
@@ -188,7 +195,7 @@
                                         <img src={user.pictureUrl} className="w-10 h-10 rounded-full border-2 border-gray-600" />
                                         <div className="text-white font-bold text-sm truncate">{user.displayName}</div>
                                     </div>
-                                    <button onClick={() => {liff.logout(); window.location.reload();}} className="w-full bg-gray-700 text-white py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 font-bold">
+                                    <button onClick={handleLogout} className="w-full bg-gray-700 hover:bg-gray-600 text-white py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 font-bold">
                                         <LogOut /> 登出系統
                                     </button>
                                 </div>
@@ -196,7 +203,7 @@
                         </div>
                         <div className="flex-1 flex flex-col bg-[#f8fafc] overflow-hidden">
                             <header className="h-16 bg-white border-b px-8 flex items-center justify-between shadow-sm shrink-0">
-                                <div className="text-xs font-bold text-gray-400 tracking-widest uppercase italic">Location: {view}</div>
+                                <div className="text-xs font-bold text-gray-400 tracking-widest uppercase">Location: {view}</div>
                             </header>
                             <main className="flex-1 overflow-auto no-scrollbar">
                                 {view === 'dashboard' && <Dashboard />}
