@@ -16,7 +16,7 @@
         .menu-item:hover:not(.active-item) { background-color: #3d444d; }
         table th { text-align: center !important; white-space: nowrap; font-size: 12px; font-weight: 800; color: #6b7280; padding: 12px; }
         table td { text-align: center !important; font-size: 13px; padding: 12px 8px; border-bottom: 1px solid #f3f4f6; }
-        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        .fade-in { animation: fadeIn 0.3s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .bg-head { background-color: #f9fafb; }
@@ -32,7 +32,7 @@
     <script type="text/babel">
         const { useState, useEffect, useContext, createContext, Fragment, useMemo } = React;
         const LIFF_ID = "2005868456-cfANNVou"; 
-        const GAS_URL = "https://script.google.com/macros/s/AKfycbzKghpYvCSjymxKbZ9tWjTZYJMEGk9uvgnQM-6oBtmFVlLFNKRQLwAHIOFyIkDS2IM/exec";
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbwcpE0ZDUwpQStkaDURFIYlliMH3KrJ0x0KhuwQrd6WqSwx5IfUwjGebeaIqnHXYC91/exec";
         const UserContext = createContext(null);
 
         async function callAPI(action, data = {}) {
@@ -102,7 +102,7 @@
         // --- 抽獎與活動組件 ---
         const getBatchColor = (b) => { const n = parseInt(String(b).replace(/\D/g, ''))||0; return ['text-red-600','text-blue-600','text-green-600','text-purple-600'][n%4] || 'text-gray-800'; };
 
-        // 🌟 全版抽獎 UI (寬度優化 + 置中)
+        // 🌟 全版抽獎 UI (寬度優化 + 置中 + 秒開)
         const LotteryDrawer = ({ isOpen, activity, onClose, onDataChange }) => {
             const [candidates, setCandidates] = useState([]);
             const [winners, setWinners] = useState([]);
@@ -116,7 +116,7 @@
                     callAPI('getLotteryParticipants', { id: activity['活動試算表ID'] }).then(res => {
                         const all = res || [];
                         setCandidates(all);
-                        setWinners(all.filter(p => p.batch));
+                        setWinners(all.filter(p => p.batch)); // 顯示已中獎者
                     });
                 }
             }, [isOpen, activity]);
@@ -124,40 +124,50 @@
             const handleDraw = async () => {
                 if (!prizeName) return alert("請輸入獎項名稱");
                 setDrawing(true);
+                
                 const pool = candidates.filter(p => !p.batch && (!onlyCheckedIn || p.status !== "未簽到"));
                 if (pool.length < drawCount) { setDrawing(false); return alert("合格人數不足"); }
                 
                 const newWinners = [];
+                const poolCopy = [...pool]; // 複製一份以免影響原陣列
+
                 for(let i=0; i<drawCount; i++) {
-                    const idx = Math.floor(Math.random() * pool.length);
-                    const w = pool.splice(idx, 1)[0];
-                    newWinners.push({ row: w._row, prize: prizeName });
+                    const idx = Math.floor(Math.random() * poolCopy.length);
+                    const w = poolCopy.splice(idx, 1)[0];
+                    newWinners.push({ row: w._row, prize: prizeName, name: w.name, phone: w.phone });
                 }
 
-                // 樂觀更新 (先更新 UI)
-                setDrawing(false);
-                const res = await callAPI('saveLotteryResults', { id: activity['活動試算表ID'], winners: newWinners });
+                // ⚡️ 樂觀更新：先在前端顯示結果，再叫後端存檔
+                // 先算出下一梯次應該是幾號
+                const currentBatches = new Set(winners.map(w => String(w.batch).trim()));
+                const nextBatch = currentBatches.size + 1;
+                const nextBatchName = `第 ${nextBatch} 梯`;
+
+                const displayWinners = newWinners.map(w => ({ ...w, batch: nextBatchName }));
+                setWinners([...displayWinners, ...winners]); // 新的放最上面
                 
+                // 標記這些人已中獎，避免重複抽
+                setCandidates(prev => prev.map(p => {
+                    const win = newWinners.find(w => w.row === p._row);
+                    return win ? { ...p, batch: nextBatchName, prize: prizeName } : p;
+                }));
+
+                setDrawing(false); // UI 解鎖
+
+                // 後端存檔 (背景執行)
+                const res = await callAPI('saveLotteryResults', { id: activity['活動試算表ID'], winners: newWinners });
                 if (res.success) {
-                    // 更新本地顯示
-                    const batchList = newWinners.map(nw => {
-                        const p = candidates.find(c => c._row === nw.row);
-                        return { ...p, prize: nw.prize, batch: res.batch };
-                    });
-                    setWinners([...batchList, ...winners]);
-                    setCandidates(prev => prev.map(p => {
-                        const win = newWinners.find(w => w.row === p._row);
-                        return win ? { ...p, prize: win.prize, batch: res.batch } : p;
-                    }));
-                    onDataChange();
-                } else alert("存檔錯誤，請重試");
+                    onDataChange(); // 通知外部更新
+                } else {
+                    alert("⚠️ 存檔失敗，請截圖保存目前畫面！\n錯誤：" + res.error);
+                }
             };
 
             const handleClear = async () => {
                 if(!confirm("確定清除？")) return;
-                await callAPI('clearLotteryData', { id: activity['活動試算表ID'] });
                 setWinners([]);
                 setCandidates(prev => prev.map(p => ({ ...p, prize: "", batch: "" })));
+                await callAPI('clearLotteryData', { id: activity['活動試算表ID'] });
                 onDataChange();
             };
 
@@ -192,7 +202,7 @@
                             </thead>
                             <tbody>
                                 {winners.map((w, i) => (
-                                    <tr key={i} className="border-b hover:bg-yellow-50"><td className={`p-4 font-black ${getBatchColor(w.batch)}`}>第 {w.batch} 梯</td><td className="p-4 font-bold">{w.prize}</td><td className="p-4 font-bold">{w.name}</td><td className="p-4 text-gray-600 font-mono">{w.phone}</td></tr>
+                                    <tr key={i} className="border-b hover:bg-yellow-50"><td className={`p-4 font-black ${getBatchColor(w.batch)}`}>{w.batch.includes("梯") ? w.batch : `第 ${w.batch} 梯`}</td><td className="p-4 font-bold">{w.prize}</td><td className="p-4 font-bold">{w.name}</td><td className="p-4 text-gray-600 font-mono">{w.phone}</td></tr>
                                 ))}
                             </tbody>
                         </table>
@@ -291,7 +301,8 @@
                                         <td className="p-4 text-center font-bold text-blue-600">{act['報名人數']}</td>
                                         <td className="p-4 text-center text-gray-600">{act['核銷人數']}</td>
                                         <td className="p-4 text-center">{act['狀態']}</td>
-                                        <td className="p-4 text-center min-w-[550px] whitespace-nowrap">
+                                        {/* 🌟 欄位寬度強制加大至 600px */}
+                                        <td className="p-4 text-center min-w-[600px] whitespace-nowrap">
                                             <div className="flex gap-2 justify-center">
                                                 <a href={act['報名前端網址']} target="_blank" className="bg-gray-200 px-3 py-1 rounded text-xs font-bold hover:bg-gray-300">網址</a>
                                                 <button className="bg-blue-500 text-white px-3 py-1 rounded text-xs font-bold hover:bg-blue-600">明細</button>
