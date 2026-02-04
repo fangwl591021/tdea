@@ -20,8 +20,6 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .bg-head { background-color: #f9fafb; }
-        
-        /* 抽屜與彈窗 */
         .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 50; transition: opacity 0.3s; }
         .drawer-content { position: fixed; right: 0; top: 0; bottom: 0; width: 450px; background: white; z-index: 51; box-shadow: -5px 0 20px rgba(0,0,0,0.2); transition: transform 0.3s ease-out; transform: translateX(100%); display: flex; flex-direction: column; }
         .drawer-open .drawer-content { transform: translateX(0); }
@@ -34,7 +32,7 @@
     <script type="text/babel">
         const { useState, useEffect, useContext, createContext, Fragment, useMemo } = React;
         const LIFF_ID = "2005868456-cfANNVou"; 
-        const GAS_URL = "https://script.google.com/macros/s/AKfycbxKw-6unh4VyljNLIfsc6Te3rJjqdJZZHH7olem-t1skxuGulxtVDZ98r0EPAoqyT2O/exec";
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbxc6apBYFs9mN8fI0LSFXJm85q7-q-WvYbFdVl2cKfupIU4D_HGL3i0PGnHQUPjlA31/exec";
         const UserContext = createContext(null);
 
         async function callAPI(action, data = {}) {
@@ -101,7 +99,7 @@
             return <UserContext.Provider value={{...userProfile}}>{children}</UserContext.Provider>;
         };
 
-        // --- 活動管理 (修正版) ---
+        // --- 組件與工具 ---
         const getBatchColor = (b) => { const n = parseInt(String(b).replace(/\D/g, ''))||0; return ['text-red-600','text-blue-600','text-green-600','text-purple-600'][n%4] || 'text-gray-800'; };
 
         const LotteryDrawer = ({ isOpen, activity, onClose, onDataChange }) => {
@@ -127,14 +125,12 @@
                 setDrawing(true);
                 const pool = candidates.filter(p => !p.batch && (!onlyCheckedIn || p.status !== "未簽到"));
                 if (pool.length < drawCount) { setDrawing(false); return alert("合格人數不足"); }
-                
                 const newWinners = [];
                 for(let i=0; i<drawCount; i++) {
                     const idx = Math.floor(Math.random() * pool.length);
                     const w = pool.splice(idx, 1)[0];
                     newWinners.push({ row: w._row, prize: prizeName });
                 }
-
                 const res = await callAPI('saveLotteryResults', { id: activity['活動試算表ID'], winners: newWinners });
                 setDrawing(false);
                 if (res.success) {
@@ -238,6 +234,7 @@
             const [loading, setLoading] = useState(true);
             const [isModalOpen, setIsModalOpen] = useState(false);
             const [lotteryTarget, setLotteryTarget] = useState(null);
+            const [syncing, setSyncing] = useState(false);
 
             const refresh = () => { setLoading(true); callAPI('getActivityList').then(res => { setList(res.data || []); setLoading(false); }); };
             useEffect(() => { refresh(); }, []);
@@ -246,6 +243,19 @@
                 if(!confirm(`下架 ${name}?`)) return;
                 await callAPI('updateActivityStatus', { name, status: "下架" });
                 refresh();
+            };
+
+            const handleSync = async () => {
+                if(!confirm("這將強制掃描所有活動的試算表並更新人數，可能需要幾秒鐘。\n確定執行？")) return;
+                setSyncing(true);
+                const res = await callAPI('syncActivityCounts');
+                setSyncing(false);
+                if (res.success) {
+                    alert("同步完成！\n" + res.logs.join("\n"));
+                    refresh();
+                } else {
+                    alert("同步失敗: " + res.message);
+                }
             };
 
             return (
@@ -257,6 +267,9 @@
                         <div className="flex gap-2">
                             <button onClick={() => setIsModalOpen(true)} className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold shadow flex gap-2 items-center"><IconPlus/> 新增</button>
                             <button onClick={refresh} className="bg-blue-500 text-white px-4 py-2 rounded-lg font-bold shadow">重整</button>
+                            <button onClick={handleSync} disabled={syncing} className="bg-purple-600 text-white px-4 py-2 rounded-lg font-bold shadow hover:bg-purple-700">
+                                {syncing ? "同步中..." : "強制同步數據"}
+                            </button>
                         </div>
                     </div>
                     <div className="bg-white rounded-xl shadow overflow-hidden">
@@ -285,49 +298,14 @@
 
         const Dashboard = () => {
             const [stats, setStats] = useState({ activityCount: '-', assocCount: '-', vendorCount: '-' });
-            const [recentList, setRecentList] = useState([]);
-            
-            useEffect(() => { 
-                callAPI('getDashboardSummary').then(res => { 
-                    if(res.success) {
-                        setStats(res.stats);
-                        setRecentList(res.recentActivities || []);
-                    }
-                }); 
-            }, []);
-
+            useEffect(() => { callAPI('getDashboardSummary').then(res => { if(res.success) setStats(res.stats); }); }, []);
             return (
                 <div className="p-8 fade-in">
                     <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2"><BarChart2 /> 系統概覽</h2>
-                    <div className="grid grid-cols-3 gap-4 mb-8">
+                    <div className="grid grid-cols-3 gap-4">
                         <div className="bg-white p-6 rounded-2xl shadow-sm border"><p className="text-gray-400 text-xs font-bold">上架活動</p><h3 className="text-2xl font-black text-green-600">{stats.activityCount}</h3></div>
                         <div className="bg-white p-6 rounded-2xl shadow-sm border"><p className="text-gray-400 text-xs font-bold">協會會員</p><h3 className="text-2xl font-black text-blue-600">{stats.assocCount}</h3></div>
                         <div className="bg-white p-6 rounded-2xl shadow-sm border"><p className="text-gray-400 text-xs font-bold">廠商會員</p><h3 className="text-2xl font-black text-purple-600">{stats.vendorCount}</h3></div>
-                    </div>
-                    
-                    <h3 className="text-lg font-bold text-gray-700 mb-4">🔥 近期熱門活動</h3>
-                    <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-gray-50 border-b">
-                                <tr>
-                                    <th className="p-4">活動名稱</th>
-                                    <th className="p-4 text-center">狀態</th>
-                                    <th className="p-4 text-center">報名</th>
-                                    <th className="p-4 text-center">核銷</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {recentList.length === 0 ? <tr><td colSpan="4" className="p-8 text-center text-gray-400">尚無活動</td></tr> : 
-                                recentList.map((act, idx) => (
-                                    <tr key={idx} className="border-b hover:bg-gray-50">
-                                        <td className="p-4 font-bold">{act['活動名稱']}</td>
-                                        <td className="p-4 text-center"><span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">{act['狀態']}</span></td>
-                                        <td className="p-4 text-center font-bold text-blue-600">{act['報名人數']}</td>
-                                        <td className="p-4 text-center text-gray-500">{act['核銷人數']}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
                     </div>
                 </div>
             );
