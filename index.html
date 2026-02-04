@@ -32,7 +32,7 @@
     <script type="text/babel">
         const { useState, useEffect, useContext, createContext, Fragment, useMemo } = React;
         const LIFF_ID = "2005868456-cfANNVou"; 
-        const GAS_URL = "https://script.google.com/macros/s/AKfycbwVfmiltbEMgyTq60xWfiUeyPWo4_w_a5kr2mbgGEcnOHpzyKDBH3Z-X2Ie7LRG74Xe/exec";
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbyj6KjGZ1UEEwjbhpcJomAF_9gyvzE0fIE-VwqZmO1rAk_5fVRSJieWPWJRO4VoopBo/exec";
         const UserContext = createContext(null);
 
         async function callAPI(action, data = {}) {
@@ -102,7 +102,7 @@
         // --- 抽獎與活動組件 ---
         const getBatchColor = (b) => { const n = parseInt(String(b).replace(/\D/g, ''))||0; return ['text-red-600','text-blue-600','text-green-600','text-purple-600'][n%4] || 'text-gray-800'; };
 
-        // 🌟 全版抽獎 UI
+        // 🌟 修正後的滿版抽獎 Drawer (表格拉開 + 置中)
         const LotteryDrawer = ({ isOpen, activity, onClose, onDataChange }) => {
             const [candidates, setCandidates] = useState([]);
             const [winners, setWinners] = useState([]);
@@ -179,8 +179,16 @@
                         總名單：{candidates.length} 人 | <label className="cursor-pointer ml-4"><input type="checkbox" className="w-4 h-4" checked={onlyCheckedIn} onChange={e=>setOnlyCheckedIn(e.target.checked)}/> 僅限已簽到</label>
                     </div>
                     <div className="flex-1 overflow-auto p-8 bg-gray-50">
-                        <table className="w-full max-w-5xl mx-auto text-lg text-left bg-white rounded-xl shadow-lg overflow-hidden">
-                            <thead className="bg-gray-200 text-gray-700"><tr><th className="p-4">梯次</th><th className="p-4">獎項</th><th className="p-4">姓名</th><th className="p-4">電話</th></tr></thead>
+                        {/* 🌟 修正：表格置中並寬度拉到 90% */}
+                        <table className="w-[90%] mx-auto text-lg text-center bg-white rounded-xl shadow-lg overflow-hidden">
+                            <thead className="bg-gray-200 text-gray-700">
+                                <tr>
+                                    <th className="p-4 text-center">梯次</th>
+                                    <th className="p-4 text-center">獎項</th>
+                                    <th className="p-4 text-center">姓名</th>
+                                    <th className="p-4 text-center">電話</th>
+                                </tr>
+                            </thead>
                             <tbody>
                                 {winners.map((w, i) => (
                                     <tr key={i} className="border-b hover:bg-yellow-50"><td className={`p-4 font-black ${getBatchColor(w.batch)}`}>第 {w.batch} 梯</td><td className="p-4 font-bold">{w.prize}</td><td className="p-4 font-bold">{w.name}</td><td className="p-4 text-gray-600 font-mono">{w.phone}</td></tr>
@@ -300,7 +308,6 @@
             );
         };
 
-        // 🌟 修正後的總覽 Dashboard (補回表格)
         const Dashboard = () => {
             const [stats, setStats] = useState({ activityCount: '-', assocCount: '-', vendorCount: '-' });
             const [recentList, setRecentList] = useState([]);
