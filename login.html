@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TDEA 活動專區</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f8fafc; }
+        .bg-gradient-custom { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2); }
+        .input-focus:focus { border-color: #10b981; box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1); }
+        .fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .step-inactive { filter: grayscale(1); opacity: 0.5; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-5">
+
+    <!-- 🟢 1. 載入中狀態 -->
+    <div id="loadingPage" class="flex flex-col items-center space-y-4 fade-in">
+        <div class="w-16 h-16 border-4 border-emerald-100 border-t-emerald-600 rounded-full animate-spin"></div>
+        <p class="text-emerald-800 font-bold tracking-widest">系統連線中...</p>
+    </div>
+
+    <!-- 🟢 2. 登入/註冊表單 (未綁定時顯示) -->
+    <div id="registerForm" class="hidden w-full max-w-md space-y-6 fade-in">
+        <div class="text-center space-y-2 mb-8">
+            <div class="w-20 h-20 bg-gradient-custom rounded-3xl shadow-xl flex items-center justify-center mx-auto mb-4 rotate-3">
+                <i class="fa-solid fa-calendar-check text-4xl text-white"></i>
+            </div>
+            <h1 class="text-3xl font-black text-emerald-900 tracking-tighter">活動專區綁定</h1>
+            <p class="text-gray-500 font-medium">請完成資料驗證以報名活動</p>
+        </div>
+
+        <div class="glass-card p-8 rounded-[2.5rem] shadow-2xl space-y-6">
+            <!-- LINE 資訊 -->
+            <div class="flex items-center gap-4 p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                <img id="userPicture" class="w-12 h-12 rounded-full border-2 border-white shadow-sm" src="" alt="">
+                <div>
+                    <p class="text-xs text-emerald-600 font-bold">LINE 帳號連動中</p>
+                    <p id="userName" class="font-black text-gray-800">-</p>
+                </div>
+            </div>
+
+            <!-- 身分選擇 -->
+            <div class="space-y-2">
+                <label class="text-sm font-black text-gray-400 ml-1 uppercase">身分識別</label>
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="setType('本業會員')" id="btnAssoc" class="py-3 rounded-2xl font-bold border-2 transition-all border-gray-100 bg-gray-50 text-gray-400">協會會員</button>
+                    <button onclick="setType('廠商會員')" id="btnVendor" class="py-3 rounded-2xl font-bold border-2 transition-all border-gray-100 bg-gray-50 text-gray-400">廠商會員</button>
+                </div>
+                <button onclick="setType('非會員')" id="btnGuest" class="w-full py-3 rounded-2xl font-bold border-2 transition-all border-gray-100 bg-gray-50 text-gray-400 mt-2">非會員 / 一般大眾</button>
+            </div>
+
+            <!-- 會員編號 (僅會員顯示) -->
+            <div id="memberIdArea" class="hidden space-y-2">
+                <label class="text-sm font-black text-gray-400 ml-1 uppercase">會員編號</label>
+                <div class="relative">
+                    <input id="memberId" type="text" placeholder="請輸入名冊上的編號" class="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-black text-lg outline-none input-focus transition-all">
+                    <i class="fa-solid fa-id-card absolute right-4 top-5 text-gray-300"></i>
+                </div>
+            </div>
+
+            <!-- 聯絡電話 -->
+            <div class="space-y-2">
+                <label class="text-sm font-black text-gray-400 ml-1 uppercase">聯絡手機</label>
+                <div class="relative">
+                    <input id="userPhone" type="tel" placeholder="0912345678" maxlength="10" class="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-black text-lg outline-none input-focus transition-all">
+                    <i class="fa-solid fa-mobile-screen absolute right-4 top-5 text-gray-300"></i>
+                </div>
+            </div>
+
+            <!-- 提交按鈕 -->
+            <button id="submitBtn" onclick="handleBind()" class="w-full bg-gradient-custom text-white py-5 rounded-[1.5rem] font-black text-xl shadow-lg shadow-emerald-200 active:scale-95 transition-all">
+                <span id="btnText">確認綁定並進入</span>
+                <i id="btnLoading" class="fa-solid fa-circle-notch animate-spin hidden"></i>
+            </button>
+        </div>
+        
+        <p class="text-center text-xs text-gray-400 font-bold">© TDEA 台灣數位教育協會</p>
+    </div>
+
+    <!-- 🟢 3. 成功頁面 / 跳轉中 -->
+    <div id="successPage" class="hidden flex flex-col items-center text-center space-y-6 fade-in">
+        <div class="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center text-green-600">
+            <i class="fa-solid fa-check-double text-5xl"></i>
+        </div>
+        <h2 class="text-3xl font-black text-gray-800">身分驗證成功</h2>
+        <p class="text-gray-500 font-bold">正在進入活動專區...</p>
+    </div>
+
+    <script>
+        const LIFF_ID = "2005868456-cfANNVou";
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbwcpE0ZDUwpQStkaDURFIYlliMH3KrJ0x0KhuwQrd6WqSwx5IfUwjGebeaIqnHXYC91/exec";
+        
+        let userType = "";
+        let lineUserId = "";
+
+        // 初始化
+        window.onload = async () => {
+            try {
+                await liff.init({ liffId: LIFF_ID });
+                if (!liff.isLoggedIn()) { liff.login(); return; }
+                
+                const profile = await liff.getProfile();
+                lineUserId = profile.userId;
+                document.getElementById('userName').textContent = profile.displayName;
+                document.getElementById('userPicture').src = profile.pictureUrl;
+
+                // 🌟 第一步：檢查是否已經綁定
+                checkIsBound(lineUserId);
+            } catch (err) {
+                alert("LIFF 初始化失敗");
+            }
+        };
+
+        // 切換身分按鈕 UI
+        function setType(type) {
+            userType = type;
+            const btns = {
+                '本業會員': 'btnAssoc',
+                '廠商會員': 'btnVendor',
+                '非會員': 'btnGuest'
+            };
+            
+            Object.values(btns).forEach(id => {
+                document.getElementById(id).className = "py-3 rounded-2xl font-bold border-2 transition-all border-gray-100 bg-gray-50 text-gray-400";
+            });
+            
+            document.getElementById(btns[type]).className = "py-3 rounded-2xl font-black border-2 transition-all border-emerald-500 bg-emerald-50 text-emerald-600 shadow-sm";
+            
+            // 會員編號輸入框顯示邏輯
+            document.getElementById('memberIdArea').style.display = type.includes('會員') ? 'block' : 'none';
+        }
+
+        // 向 GAS 檢查綁定狀態
+        async function checkIsBound(uid) {
+            try {
+                const res = await fetch(GAS_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'checkMemberBinding', userId: uid })
+                });
+                const data = await res.json();
+                
+                if (data.isBound) {
+                    showSuccess();
+                } else {
+                    document.getElementById('loadingPage').classList.add('hidden');
+                    document.getElementById('registerForm').classList.remove('hidden');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // 執行綁定動作
+        async function handleBind() {
+            const phone = document.getElementById('userPhone').value.trim();
+            const memberId = document.getElementById('memberId').value.trim();
+
+            if (!userType) return alert("請選擇您的身分");
+            if (!phone || phone.length < 10) return alert("請輸入正確的手機號碼");
+            if (userType.includes('會員') && !memberId) return alert("會員請輸入編號以利綁定");
+
+            toggleBtn(true);
+
+            try {
+                const res = await fetch(GAS_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'bindMember',
+                        userId: lineUserId,
+                        type: userType,
+                        memberId: memberId,
+                        phone: phone,
+                        name: document.getElementById('userName').textContent
+                    })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    showSuccess();
+                } else {
+                    alert("驗證失敗：" + data.message);
+                    toggleBtn(false);
+                }
+            } catch (e) {
+                alert("伺服器連線失敗");
+                toggleBtn(false);
+            }
+        }
+
+        function showSuccess() {
+            document.getElementById('loadingPage').classList.add('hidden');
+            document.getElementById('registerForm').classList.add('hidden');
+            document.getElementById('successPage').classList.remove('hidden');
+            // 這裡之後可以跳轉到您的活動清單頁面
+            // setTimeout(() => { window.location.href = "activities.html"; }, 1500);
+        }
+
+        function toggleBtn(loading) {
+            document.getElementById('btnText').style.display = loading ? 'none' : 'inline';
+            document.getElementById('btnLoading').classList.toggle('hidden', !loading);
+            document.getElementById('submitBtn').disabled = loading;
+        }
+    </script>
+</body>
+</html>
