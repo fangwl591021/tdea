@@ -14,16 +14,18 @@
         .sidebar-bg { background-color: #2d333b; }
         .active-item { background-color: #243b32; border-left: 4px solid #4ade80; color: #4ade80; }
         .menu-item:hover:not(.active-item) { background-color: #3d444d; }
-        table th { text-align: center !important; white-space: nowrap; font-size: 12px; font-weight: 800; color: #6b7280; padding: 12px; border-bottom: 2px solid #edf2f7; background-color: #f9fafb; }
-        table td { text-align: center !important; font-size: 13px; padding: 10px 6px; border-bottom: 1px solid #f3f4f6; }
+        table th { text-align: center !important; white-space: nowrap; font-size: 13px; font-weight: 800; color: #6b7280; padding: 15px; border-bottom: 2px solid #edf2f7; background-color: #f9fafb; }
+        table td { text-align: center !important; font-size: 14px; padding: 12px 8px; border-bottom: 1px solid #f3f4f6; }
         .fade-in { animation: fadeIn 0.4s forwards; }
         @keyframes fadeIn { from{opacity:0; transform: translateY(10px);} to{opacity:1; transform: translateY(0);} }
+        
         .drawer-root { position: fixed; inset: 0; z-index: 9999; pointer-events: none; visibility: hidden; transition: visibility 0.3s; }
         .drawer-root.is-open { pointer-events: auto; visibility: visible; }
-        .drawer-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); opacity: 0; transition: opacity 0.3s; backdrop-filter: blur(2px); }
+        .drawer-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); opacity: 0; transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1); backdrop-filter: blur(2px); }
         .drawer-root.is-open .drawer-overlay { opacity: 1; }
         .drawer-container { position: absolute; right: 0; top: 0; bottom: 0; width: 520px; max-width: 95vw; background: white; box-shadow: -10px 0 50px rgba(0,0,0,0.2); transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; }
         .drawer-root.is-open .drawer-container { transform: translateX(0); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body>
@@ -67,9 +69,73 @@
                 };
                 init();
             }, []);
-            if (status === "LOADING") return <div className="h-screen flex items-center justify-center italic text-gray-400">Syncing TDEA Hub...</div>;
-            if (status !== "AUTHORIZED") return <div className="h-screen flex items-center justify-center font-bold text-red-500 uppercase">ACCESS DENIED</div>;
+            if (status === "LOADING") return <div className="h-screen flex items-center justify-center italic text-gray-400">Loading TDEA Hub...</div>;
+            if (status !== "AUTHORIZED") return <div className="h-screen flex items-center justify-center font-bold text-red-500 uppercase tracking-tighter">Access Forbidden</div>;
             return <UserContext.Provider value={{...userProfile}}>{children}</UserContext.Provider>;
+        };
+
+        // 🌟 報名明細分頁組件
+        const DetailPage = ({ activity, onBack, onRefresh }) => {
+            const [data, setData] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [search, setSearch] = useState("");
+
+            const fetchList = () => {
+                setLoading(true);
+                callAPI('getActivityDetails', { id: activity['活動試算表ID'] }).then(res => {
+                    setData(res || []);
+                    setLoading(false);
+                });
+            };
+
+            useEffect(() => { if(activity) fetchList(); }, [activity]);
+
+            const handleToggle = async (row, currentStatus) => {
+                const res = await callAPI('toggleCheckInStatus', { id: activity['活動試算表ID'], row, status: currentStatus });
+                if(res.success) fetchList();
+                onRefresh(); // 更新列表的核銷數
+            };
+
+            const filtered = data.filter(i => (i.姓名 || "").includes(search) || (i.電話 || "").includes(search));
+
+            return (
+                <div className="p-8 fade-in">
+                    <div className="mb-8 flex items-center gap-4">
+                        <button onClick={onBack} className="bg-white border-2 px-6 py-2 rounded-2xl font-black text-gray-400 shadow hover:bg-gray-50 transition">← 返回列表</button>
+                        <h2 className="text-3xl font-black text-gray-800 tracking-tighter">📂 報名明細管理：{activity['活動名稱']}</h2>
+                    </div>
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl p-8 border-4 border-white">
+                        <div className="flex justify-between mb-8 border-b pb-6">
+                            <input placeholder="搜尋姓名或電話..." className="border-2 p-3 rounded-2xl w-96 outline-none focus:border-blue-400" value={search} onChange={e=>setSearch(e.target.value)} />
+                            <button onClick={fetchList} className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-black shadow-xl active:scale-95 transition">重新整理數據</button>
+                        </div>
+                        {loading ? <div className="p-32 text-center text-gray-300 font-black italic tracking-widest animate-pulse">LOADING DATA...</div> : (
+                            <table className="w-full text-center">
+                                <thead className="text-gray-400 border-b"><tr><th>姓名</th><th>手機號碼</th><th>核銷狀態</th><th>操作</th></tr></thead>
+                                <tbody>
+                                    {filtered.length === 0 ? <tr><td colSpan="4" className="p-20 text-gray-300 italic">查無報名資料</td></tr> : filtered.map((r, idx) => (
+                                        <tr key={idx} className="border-b hover:bg-gray-50 transition-all">
+                                            <td className="p-6 font-black text-gray-700">{r.姓名}</td>
+                                            <td className="p-6 font-mono text-gray-500">{r.電話}</td>
+                                            <td className="p-6">
+                                                {r.核銷狀態 === "未簽到" 
+                                                    ? <span className="text-red-400 font-bold bg-red-50 px-4 py-1.5 rounded-full text-xs border border-red-100 uppercase">未簽到</span> 
+                                                    : <span className="text-green-600 font-bold bg-green-50 px-4 py-1.5 rounded-full text-xs border border-green-100">{r.核銷狀態}</span>
+                                                }
+                                            </td>
+                                            <td className="p-6">
+                                                <button onClick={() => handleToggle(r._row, r.核銷狀態)} className={`px-10 py-3 rounded-2xl text-white font-black text-sm shadow-lg active:scale-90 transition ${r.核銷狀態 === "未簽到" ? 'bg-blue-600 shadow-blue-100' : 'bg-gray-400 shadow-gray-100'}`}>
+                                                    {r.核銷狀態 === "未簽到" ? "確認簽到" : "取消簽到"}
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+                </div>
+            );
         };
 
         const EditDrawer = ({ isOpen, onClose, item, sheetName, onSaved }) => {
@@ -78,10 +144,10 @@
             useEffect(() => { if (item) setFormData({...item}); }, [item]);
             
             const fields = useMemo(() => {
-                const common = ["活動報名次數", "講座類次數", "教學類次數", "聯誼類次數", "備註"];
-                if (sheetName.includes("本業")) return ["會員編號", "身分", "姓名", "性別", "會員資格(Y/N)", ...common, "行動電話"];
-                if (sheetName.includes("廠商")) return ["會員編號", "公司名稱", "公司統編", "公司負責人", "聯絡窗口", "會員資格(Y/N)", ...common, "行動電話"];
-                return ["姓名", "行動電話", "會員資格(Y/N)", ...common];
+                const stats = ["活動報名次數", "講座類次數", "教學類次數", "聯誼類次數", "備註"];
+                if (sheetName.includes("本業")) return ["會員編號", "身分", "姓名", "性別", "會員資格(Y/N)", ...stats, "行動電話"];
+                if (sheetName.includes("廠商")) return ["會員編號", "公司名稱", "公司統編", "公司負責人", "聯絡窗口", "會員資格(Y/N)", ...stats, "行動電話"];
+                return ["姓名", "行動電話", "會員資格(Y/N)", ...stats];
             }, [sheetName]);
 
             const handleSave = async () => { 
@@ -96,22 +162,22 @@
                     <div className="drawer-overlay" onClick={onClose}></div>
                     <div className="drawer-container p-8">
                         <div className="flex justify-between items-center mb-6 border-b pb-4">
-                            <h3 className="text-2xl font-black text-gray-800">✏️ 編輯會員資料</h3>
+                            <h3 className="text-2xl font-black text-gray-800">✏️ 編輯會員資料維護</h3>
                             <button onClick={onClose} className="text-gray-400 text-3xl font-bold hover:text-red-500 transition-colors">&times;</button>
                         </div>
                         <div className="flex gap-4 mb-8 pb-6 border-b">
-                            <button onClick={onClose} className="flex-1 border-2 py-4 rounded-2xl font-bold text-gray-400">取消</button>
+                            <button onClick={onClose} className="flex-1 border-2 py-4 rounded-2xl font-bold text-gray-400 hover:bg-gray-50 transition">取消返回</button>
                             <button onClick={handleSave} disabled={isSaving} className="flex-[2] bg-blue-600 text-white py-4 rounded-2xl font-black shadow-xl active:scale-95 transition">
-                                {isSaving ? "存檔中..." : "確認存檔"}
+                                {isSaving ? "正在存檔中..." : "確認存檔同步"}
                             </button>
                         </div>
-                        <div className="space-y-6 flex-1 overflow-auto pr-2">
+                        <div className="space-y-6 flex-1 overflow-auto pr-2 no-scrollbar">
                             {fields.map(f => (
                                 <div key={f}>
                                     <label className="text-xs font-black text-gray-400 block mb-2 uppercase tracking-widest">{f}</label>
-                                    {f === "備註" ? <textarea className="w-full border-2 p-4 rounded-2xl bg-gray-50 h-32 outline-none focus:border-green-400 font-bold" value={formData[f]||""} onChange={e=>setFormData({...formData,[f]:e.target.value})}/> : 
-                                     f.includes("資格") ? <select className="w-full border-2 p-4 rounded-2xl bg-gray-50 font-black text-lg focus:border-green-400 outline-none" value={formData[f]||""} onChange={e=>setFormData({...formData, [f]:e.target.value})}><option value="">請選擇</option><option value="Y">Y</option><option value="N">N</option></select> : 
-                                     <input className="w-full border-2 p-4 rounded-2xl bg-gray-50 font-black text-lg focus:border-green-400 outline-none" value={formData[f]||""} onChange={e=>setFormData({...formData,[f]:e.target.value})}/>}
+                                    {f === "備註" ? <textarea className="w-full border-2 p-4 rounded-2xl bg-gray-50 h-32 outline-none focus:border-green-400 font-bold shadow-inner" value={formData[f]||""} onChange={e=>setFormData({...formData,[f]:e.target.value})}/> : 
+                                     f.includes("資格") ? <select className="w-full border-2 p-4 rounded-2xl bg-gray-50 font-black text-lg focus:border-green-400 outline-none shadow-sm" value={formData[f]||""} onChange={e=>setFormData({...formData, [f]:e.target.value})}><option value="">請選擇</option><option value="Y">Y</option><option value="N">N</option></select> : 
+                                     <input className="w-full border-2 p-4 rounded-2xl bg-gray-50 font-black text-lg focus:border-green-400 outline-none shadow-sm" value={formData[f]||""} onChange={e=>setFormData({...formData,[f]:e.target.value})}/>}
                                 </div>
                             ))}
                         </div>
@@ -134,12 +200,8 @@
                     {k:["聯誼類次數","聯誼"],l:"聯誼"},
                     {k:["備註"],l:"備註", mw:"200px"}
                 ];
-                if (sheetName.includes("本業")) {
-                    return [{k:["序號"],l:"序"},{k:["會員編號"],l:"編號"},{k:["身分"],l:"身分"},{k:["姓名"],l:"姓名"},{k:["性別"],l:"性"},{k:["會員資格","資格"],l:"資"},...stats];
-                }
-                if (sheetName.includes("廠商")) {
-                    return [{k:["序號"],l:"序"},{k:["會員編號"],l:"編號"},{k:["公司名稱"],l:"公司"},{k:["公司統編"],l:"統編"},{k:["公司負責人"],l:"負責人"},{k:["聯絡窗口"],l:"窗口"},{k:["會員資格","資格"],l:"資"},...stats];
-                }
+                if (sheetName.includes("本業")) return [{k:["序號"],l:"序"},{k:["會員編號"],l:"編號"},{k:["身分"],l:"身分"},{k:["姓名"],l:"姓名"},{k:["性別"],l:"性"},{k:["會員資格","資格"],l:"資"},...stats];
+                if (sheetName.includes("廠商")) return [{k:["序號"],l:"序"},{k:["會員編號"],l:"編號"},{k:["公司名稱"],l:"公司"},{k:["公司統編"],l:"統編"},{k:["公司負責人"],l:"負責人"},{k:["聯絡窗口"],l:"窗口"},{k:["會員資格","資格"],l:"資"},...stats];
                 return [{k:["序號"],l:"序"},{k:["姓名"],l:"姓名"},{k:["行動電話"],l:"手機"},{k:["會員資格","資格"],l:"資"},...stats];
             }, [sheetName]);
             
@@ -148,16 +210,22 @@
             return (
                 <div className="p-8 fade-in">
                     <EditDrawer isOpen={!!editing} item={editing} sheetName={sheetName} onClose={()=>setEditing(null)} onSaved={fetchData} />
-                    <div className="flex justify-between mb-8 items-center"><h2 className="text-3xl font-black text-gray-800 tracking-tighter">{title}</h2><div className="flex gap-3"><input placeholder="快速搜尋..." className="border-2 p-3 rounded-2xl w-80 shadow-sm focus:border-blue-400 outline-none" value={search} onChange={e=>setSearch(e.target.value)}/><button onClick={fetchData} className="bg-white border-2 p-3 rounded-2xl font-bold shadow-sm hover:bg-gray-50 transition">刷新</button></div></div>
+                    <div className="flex justify-between mb-8 items-center">
+                        <h2 className="text-3xl font-black text-gray-800 tracking-tighter">{title}</h2>
+                        <div className="flex gap-3">
+                            <input placeholder="搜尋名冊..." className="border-2 p-3 rounded-2xl w-80 shadow-sm focus:border-blue-400 outline-none" value={search} onChange={e=>setSearch(e.target.value)}/>
+                            <button onClick={fetchData} className="bg-white border-2 p-3 rounded-2xl font-bold shadow-sm hover:bg-gray-50 transition">刷新列表</button>
+                        </div>
+                    </div>
                     <div className="bg-white rounded-[2.5rem] shadow-2xl border overflow-x-auto">
-                        <table className="w-full text-center">
+                        <table className="w-full text-sm text-center">
                             <thead className="bg-gray-50 border-b">
                                 <tr>{cols.map((c,i)=><th key={i} style={c.mw?{minWidth:c.mw}:{}}>{c.l}</th>)}<th>維護</th></tr>
                             </thead>
-                            <tbody>{loading ? <tr><td colSpan={cols.length+1} className="p-32 text-gray-300 italic uppercase">Syncing...</td></tr> : filtered.map((item, idx) => (
+                            <tbody>{loading ? <tr><td colSpan={cols.length+1} className="p-32 text-gray-300 italic tracking-widest uppercase animate-pulse">Syncing...</td></tr> : filtered.map((item, idx) => (
                                 <tr key={idx} className="border-b hover:bg-gray-50 transition-all">
-                                    {cols.map((c,ci)=><td key={ci} className={`${c.h ? "font-black text-blue-500" : ""} ${c.l === "備註" ? "text-left text-xs truncate max-w-[200px]" : ""}`}>{gv(item, c.k)}</td>)}
-                                    <td className="p-4"><button onClick={()=>setEditing(item)} className="bg-blue-50 text-blue-600 border-2 border-blue-100 px-4 py-1.5 rounded-xl font-bold text-xs active:scale-90 transition hover:bg-blue-600 hover:text-white">編輯</button></td>
+                                    {cols.map((c,ci)=><td key={ci} className={`${c.h ? "font-black text-blue-500 text-base" : ""} ${c.l === "備註" ? "text-left text-xs truncate max-w-[200px]" : ""}`}>{gv(item, c.k)}</td>)}
+                                    <td className="p-4"><button onClick={()=>setEditing(item)} className="bg-blue-50 text-blue-600 border-2 border-blue-100 px-4 py-1.5 rounded-xl font-bold text-xs active:scale-90 transition hover:bg-blue-600 hover:text-white">點擊編輯</button></td>
                                 </tr>
                             ))}</tbody>
                         </table>
@@ -170,49 +238,31 @@
             const [view, setView] = useState('dashboard'), [activityData, setActivityData] = useState([]), [expandedMenu, setExpandedMenu] = useState(false), [selectedDetail, setSelectedDetail] = useState(null);
             const fetchActivities = () => { callAPI('getActivityList').then(res => setActivityData(res.data || [])); };
             useEffect(() => fetchActivities(), []);
+
             return (
                 <AuthGuard>
                     <div className="flex h-screen overflow-hidden">
                         <div className="w-80 sidebar-bg text-gray-300 flex flex-col shrink-0 shadow-2xl">
-                            <div className="p-12 border-b border-gray-700 text-[#4ade80] text-4xl font-black text-center italic tracking-tighter leading-none">TDEA<br/><span className="text-[10px] tracking-widest font-bold opacity-30 not-italic uppercase">HUB v13.8</span></div>
+                            <div className="p-12 border-b border-gray-700 text-[#4ade80] text-4xl font-black text-center italic tracking-tighter leading-none">TDEA<br/><span className="text-[10px] tracking-widest font-bold opacity-30 not-italic uppercase">HUB v13.9</span></div>
                             <nav className="flex-1 mt-10 space-y-2">
-                                <div className={`px-10 py-6 cursor-pointer flex items-center gap-5 transition-all ${view==='dashboard'?'active-item':'menu-item'}`} onClick={()=>{setView('dashboard');setSelectedDetail(null);}}><BarChart2/><span>系統總覽</span></div>
+                                <div className={`px-10 py-6 cursor-pointer flex items-center gap-5 transition-all ${view==='dashboard'?'active-item':'menu-item'}`} onClick={()=>{setView('dashboard');setSelectedDetail(null);}}><BarChart2/><span>系統數據總覽</span></div>
                                 <div className={`px-10 py-6 cursor-pointer flex items-center gap-5 transition-all ${view==='activity'?'active-item':'menu-item'}`} onClick={()=>{setView('activity');setSelectedDetail(null);}}><ActivityIcon/><span>活動控制中心</span></div>
-                                <div className={`px-10 py-6 cursor-pointer flex items-center justify-between menu-item ${['assoc','vendor','guest'].includes(view)?'text-green-400':''}`} onClick={() => setExpandedMenu(!expandedMenu)}>
-                                    <div className="flex items-center gap-5"><Users/><span>會員資料管理</span></div><div className={`transition-transform duration-300 ${expandedMenu?'rotate-180':''}`}><ChevronDown/></div>
+                                <div className={`px-10 py-6 cursor-pointer flex items-center justify-between menu-item transition-all ${['assoc','vendor','guest'].includes(view)?'text-green-400':''}`} onClick={() => setExpandedMenu(!expandedMenu)}>
+                                    <div className="flex items-center gap-5"><Users/><span>名冊維護管理</span></div><div className={`transition-transform duration-300 ${expandedMenu?'rotate-180':''}`}><ChevronDown/></div>
                                 </div>
-                                {expandedMenu && (<div className="bg-[#24292f] border-l-8 border-[#243b32] transition-all"><div onClick={()=>{setView('assoc');setSelectedDetail(null);}} className={`px-16 py-4 cursor-pointer text-sm font-bold ${view==='assoc'?'text-green-400 bg-[#243b32]':'text-gray-500'}`}>協會正式名冊</div><div onClick={()=>{setView('vendor');setSelectedDetail(null);}} className={`px-16 py-4 cursor-pointer text-sm font-bold ${view==='vendor'?'text-green-400 bg-[#243b32]':'text-gray-500'}`}>廠商贊助名冊</div><div onClick={()=>{setView('guest');setSelectedDetail(null);}} className={`px-16 py-4 cursor-pointer text-sm font-bold ${view==='guest'?'text-green-400 bg-[#243b32]':'text-gray-500'}`}>一般註冊名冊</div></div>)}
+                                {expandedMenu && (<div className="bg-[#24292f] border-l-8 border-[#243b32] transition-all duration-300 overflow-hidden"><div onClick={()=>{setView('assoc');setSelectedDetail(null);}} className={`px-16 py-4 cursor-pointer text-sm font-bold ${view==='assoc'?'text-green-400 bg-[#243b32]':'text-gray-500 hover:text-white'}`}>協會會員名冊</div><div onClick={()=>{setView('vendor');setSelectedDetail(null);}} className={`px-16 py-4 cursor-pointer text-sm font-bold ${view==='vendor'?'text-green-400 bg-[#243b32]':'text-gray-500 hover:text-white'}`}>廠商贊助名冊</div><div onClick={()=>{setView('guest');setSelectedDetail(null);}} className={`px-16 py-4 cursor-pointer text-sm font-bold ${view==='guest'?'text-green-400 bg-[#243b32]':'text-gray-500 hover:text-white'}`}>一般註冊名冊</div></div>)}
                             </nav>
                         </div>
                         <main className="flex-1 overflow-auto bg-[#f8fafc] no-scrollbar">
                             {selectedDetail ? (
-                                <div className="p-8 fade-in">
-                                    <div className="mb-8 flex items-center gap-4"><button onClick={()=>setSelectedDetail(null)} className="bg-white border-2 px-6 py-2 rounded-2xl font-black text-gray-400 shadow transition hover:bg-gray-50">← 返回活動列表</button><h2 className="text-3xl font-black text-gray-800 tracking-tighter">📂 報名明細：{selectedDetail['活動名稱']}</h2></div>
-                                    <div className="bg-white rounded-[2.5rem] shadow-2xl p-8 border-4 border-white italic text-gray-300 text-center uppercase tracking-widest font-black py-40">Detail Logic Connection Pending</div>
-                                </div>
+                                <DetailPage activity={selectedDetail} onBack={()=>setSelectedDetail(null)} onRefresh={fetchActivities} />
                             ) : (
                                 <Fragment>
-                                    {view==='dashboard' && <div className="p-8 fade-in"><h2 className="text-3xl font-black mb-10 tracking-tighter italic uppercase"><BarChart2/> Global Monitor</h2><div className="grid grid-cols-3 gap-8 mb-16"><div className="bg-white p-10 rounded-[2.5rem] shadow-sm text-center border-2 border-green-50"><p className="text-xs text-gray-400 font-bold mb-1 uppercase">上架活動</p><h3 className="text-6xl font-black text-green-600">{activityData.length}</h3></div><div className="bg-white p-10 rounded-[2.5rem] shadow-sm text-center border-2 border-blue-50"><p className="text-xs text-gray-400 font-bold mb-1 uppercase">協會會員</p><h3 className="text-6xl font-black text-blue-600">494</h3></div><div className="bg-white p-10 rounded-[2.5rem] shadow-sm text-center border-2 border-purple-50"><p className="text-xs text-gray-400 font-bold mb-1 uppercase">廠商贊助</p><h3 className="text-6xl font-black text-purple-600">31</h3></div></div><div className="bg-white rounded-[2.5rem] shadow-xl overflow-hidden border w-full"><table className="w-full text-center"><thead className="bg-gray-50 border-b"><tr><th className="p-6 text-left pl-12">活動名稱</th><th>當前狀態</th><th>報名人數</th></tr></thead><tbody>{activityData.map((act,idx)=>(<tr key={idx} className="border-b hover:bg-gray-50 transition-all"><td className="p-6 font-bold text-left pl-12 text-xl">{act['活動名稱']}</td><td><span className="bg-green-100 text-green-700 px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-tighter">ONLINE</span></td><td className="p-6 font-black text-blue-600 text-3xl">{act['報名人數']}</td></tr>))}</tbody></table></div></div>}
-                                    {view==='activity' && <div className="p-6 fade-in"><div className="flex justify-between mb-10 items-center"><h2 className="text-3xl font-black italic tracking-tighter uppercase leading-none">Maintenance Console</h2><button onClick={fetchActivities} className="bg-blue-600 text-white px-10 py-3 rounded-2xl font-black shadow-xl active:scale-95 transition">刷新雲端數據</button></div><div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border-4 border-white"><table className="w-full text-center">
-                                        <thead className="bg-gray-100 border-b"><tr>
-                                            <th className="p-6 text-left pl-12">名稱 / 起迄時間</th><th className="w-24">報名</th><th className="w-24">核銷</th><th className="w-24">狀態</th><th className="min-w-[580px]">操作功能區</th>
-                                        </tr></thead>
-                                        <tbody>{activityData.map((act, i) => (<tr key={i} className="border-b hover:bg-gray-50 transition-all">
-                                            <td className="p-6 text-left pl-12"><div className="font-black text-xl mb-1">{act['活動名稱']}</div><div className="text-[11px] text-purple-600 font-bold italic tracking-tighter">📅 2026-2-10 ~ 2026-2-5</div></td>
-                                            <td className="font-black text-blue-600 text-3xl">{act['報名人數']}</td><td className="text-gray-400 text-xl font-bold">0</td>
-                                            {/* 🌟 補上缺失的狀態欄位資料列 */}
-                                            <td><span className="bg-green-100 text-green-700 px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-tighter">ONLINE</span></td>
-                                            <td className="p-4 whitespace-nowrap text-right pr-12"><div className="flex gap-2 justify-end">
-                                                <a href={act['報名前端網址']} target="_blank" className="bg-emerald-500 text-white px-5 py-3 rounded-xl font-bold text-xs shadow-lg active:scale-90 transition">網址</a>
-                                                <button onClick={()=>setSelectedDetail(act)} className="bg-blue-500 text-white px-5 py-3 rounded-xl font-bold text-xs shadow-lg active:scale-90 shadow-blue-100">明細</button>
-                                                <button className="bg-purple-500 text-white px-5 py-3 rounded-xl font-bold text-xs shadow-lg active:scale-90 shadow-purple-100">分類</button>
-                                                <button className="bg-amber-500 text-white px-5 py-3 rounded-xl font-bold text-xs shadow-lg active:scale-90 shadow-amber-100">抽獎</button>
-                                                <button onClick={()=>{if(confirm('確定下架活動?')) callAPI('updateActivityStatus',{name:act['活動名稱'],status:'下架'}).then(fetchActivities)}} className="bg-rose-500 text-white px-5 py-3 rounded-xl font-bold text-xs shadow-lg active:scale-90 shadow-rose-100">下架</button>
-                                            </div></td>
-                                        </tr>))}</tbody></table></div></div>}
-                                    {view==='assoc' && <MemberTable title="協會正式會員管理" sheetName="本業會員" />}
-                                    {view==='vendor' && <MemberTable title="廠商贊助單位管理" sheetName="廠商會員" />}
-                                    {view==='guest' && <MemberTable title="一般註冊名冊管理" sheetName="一般會員" />}
+                                    {view==='dashboard' && <div className="p-8 fade-in"><h2 className="text-3xl font-black mb-10 tracking-tighter flex items-center gap-4 italic uppercase"><BarChart2/> Global Monitor</h2><div className="grid grid-cols-3 gap-8 mb-16"><div className="bg-white p-10 rounded-[2.5rem] shadow-sm text-center border-2 border-green-50"><p className="text-xs text-gray-400 font-bold mb-1 uppercase tracking-widest">上架活動</p><h3 className="text-6xl font-black text-green-600">{activityData.length}</h3></div><div className="bg-white p-10 rounded-[2.5rem] shadow-sm text-center border-2 border-blue-50"><p className="text-xs text-gray-400 font-bold mb-1 uppercase tracking-widest">協會正式會員</p><h3 className="text-6xl font-black text-blue-600">494</h3></div><div className="bg-white p-10 rounded-[2.5rem] shadow-sm text-center border-2 border-purple-50"><p className="text-xs text-gray-400 font-bold mb-1 uppercase tracking-widest">廠商贊助單位</p><h3 className="text-6xl font-black text-purple-600">31</h3></div></div><div className="bg-white rounded-[2.5rem] shadow-xl overflow-hidden border w-full"><table className="w-full text-center"><thead className="bg-gray-50 border-b"><tr><th className="p-6 text-left pl-12">活動名稱</th><th>當前狀態</th><th>報名人數</th><th className="text-gray-400">目前簽到</th></tr></thead><tbody>{activityData.map((act,idx)=>(<tr key={idx} className="border-b hover:bg-gray-50 transition-all"><td className="p-6 font-bold text-left pl-12 text-xl">{act['活動名稱']}</td><td><span className="bg-green-100 text-green-700 px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-tighter">ONLINE</span></td><td className="p-6 font-black text-blue-600 text-3xl">{act['報名人數']}</td><td className="p-6 text-gray-500 text-xl font-bold">{act['核銷人數'] || 0}</td></tr>))}</tbody></table></div></div>}
+                                    {view==='activity' && <div className="p-6 fade-in"><div className="flex justify-between mb-10 items-center"><h2 className="text-3xl font-black italic tracking-tighter uppercase leading-none">Activity Management</h2><button onClick={fetchActivities} className="bg-blue-600 text-white px-10 py-3 rounded-2xl font-black shadow-xl active:scale-95 transition">刷新雲端數據</button></div><div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border-4 border-white"><table className="w-full text-center"><thead className="bg-gray-100 border-b"><tr><th className="p-6 text-left pl-12">活動名稱 / 起迄日</th><th>報名</th><th>核銷</th><th className="border-r">狀態</th><th className="min-w-[580px]">功能控制中心</th></tr></thead><tbody>{activityData.map((act, i) => (<tr key={i} className="border-b hover:bg-gray-50 transition-all"><td className="p-6 text-left pl-12"><div className="font-black text-xl mb-1">{act['活動名稱']}</div><div className="text-[11px] text-purple-600 font-bold italic tracking-tighter">📅 課程時程待讀取...</div></td><td className="font-black text-blue-600 text-3xl">{act['報名人數']}</td><td className="text-gray-400 text-xl font-bold">{act['核銷人數'] || 0}</td><td className="border-r"><span className="bg-green-100 text-green-700 px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-tighter">ONLINE</span></td><td className="p-4 whitespace-nowrap text-right pr-12"><div className="flex gap-2 justify-end"><a href={act['報名前端網址']} target="_blank" className="bg-emerald-500 text-white px-5 py-3 rounded-xl font-bold text-xs shadow-lg active:scale-90 transition">網址</a><button onClick={()=>setSelectedDetail(act)} className="bg-blue-500 text-white px-5 py-3 rounded-xl font-bold text-xs shadow-lg active:scale-90 shadow-blue-100 transition">明細</button><button className="bg-purple-500 text-white px-5 py-3 rounded-xl font-bold text-xs shadow-lg active:scale-90 transition">分類</button><button className="bg-amber-500 text-white px-5 py-3 rounded-xl font-bold text-xs shadow-lg active:scale-90 transition">抽獎</button><button onClick={()=>{if(confirm('確定下架活動?')) callAPI('updateActivityStatus',{name:act['活動名稱'],status:'下架'}).then(fetchActivities)}} className="bg-rose-500 text-white px-5 py-3 rounded-xl font-bold text-xs shadow-lg active:scale-90 shadow-rose-100 transition">下架</button></div></td></tr>))}</tbody></table></div></div>}
+                                    {view==='assoc' && <MemberTable title="協會正式會員名冊管理" sheetName="本業會員" />}
+                                    {view==='vendor' && <MemberTable title="廠商贊助單位名冊管理" sheetName="廠商會員" />}
+                                    {view==='guest' && <MemberTable title="一般註冊名冊資料管理" sheetName="一般會員" />}
                                 </Fragment>
                             )}
                         </main>
