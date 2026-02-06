@@ -95,7 +95,6 @@
             );
         };
 
-        // --- 🌟 修正後的編輯抽屜：完整對應您提供的欄位 ---
         const EditDrawer = ({ isOpen, onClose, item, sheetName, onSaved }) => {
             const [formData, setFormData] = useState({});
             const [isSaving, setIsSaving] = useState(false);
@@ -104,7 +103,8 @@
             const fields = useMemo(() => {
                 const stats = ["活動報名次數", "講座類次數", "教學類次數", "聯誼類次數", "備註"];
                 if (sheetName.includes("本業")) return ["會員編號", "身分", "姓名", "性別", "會員資格(Y/N)", ...stats, "行動電話"];
-                if (sheetName.includes("廠商")) return ["會員編號", "廠商會員", "公司名稱", "公司統編", "公司負責人", "聯絡窗口", "會員資格(Y/N)", ...stats, "行動電話"];
+                // 🌟 修正點：移除「廠商會員」類別欄位
+                if (sheetName.includes("廠商")) return ["會員編號", "公司名稱", "公司統編", "公司負責人", "聯絡窗口", "會員資格(Y/N)", ...stats, "行動電話"];
                 return ["姓名", "行動電話", "會員資格(Y/N)", ...stats];
             }, [sheetName]);
 
@@ -150,7 +150,6 @@
             useEffect(() => fetchData(), [sheetName]);
             const filtered = data.filter(d => Object.values(d).some(v => String(v).includes(search)));
             
-            // 🌟 修正點：完整補全廠商、本業與一般名冊的顯示欄位
             const cols = useMemo(() => {
                 const stats = [
                     {k:["活動報名次數","報名"],l:"報名", highlight: true},
@@ -165,8 +164,9 @@
                     ];
                 }
                 if (sheetName.includes("廠商")) {
+                    // 🌟 修正點：移除廠商名冊中的「類別」欄位
                     return [
-                        {k:["序號"],l:"序"},{k:["會員編號"],l:"編號"},{k:["廠商會員"],l:"類別"},{k:["公司名稱"],l:"公司"},{k:["公司統編"],l:"統編"},{k:["公司負責人"],l:"負責人"},{k:["聯絡窗口"],l:"窗口"},{k:["會員資格","資格"],l:"資"},...stats
+                        {k:["序號"],l:"序"},{k:["會員編號"],l:"編號"},{k:["公司名稱"],l:"公司"},{k:["公司統編"],l:"統編"},{k:["公司負責人"],l:"負責人"},{k:["聯絡窗口"],l:"窗口"},{k:["會員資格","資格"],l:"資"},...stats
                     ];
                 }
                 return [
