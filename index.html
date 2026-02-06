@@ -19,13 +19,13 @@
         .fade-in { animation: fadeIn 0.4s forwards; }
         @keyframes fadeIn { from{opacity:0; transform: translateY(10px);} to{opacity:1; transform: translateY(0);} }
         
-        /* 🌟 抽屜樣式修正：使用固定全螢幕定位 */
         .drawer-root { position: fixed; inset: 0; z-index: 9999; pointer-events: none; visibility: hidden; transition: visibility 0.3s; }
         .drawer-root.is-open { pointer-events: auto; visibility: visible; }
         .drawer-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); opacity: 0; transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1); backdrop-filter: blur(2px); }
         .drawer-root.is-open .drawer-overlay { opacity: 1; }
-        .drawer-container { position: absolute; right: 0; top: 0; bottom: 0; width: 450px; max-width: 90vw; background: white; box-shadow: -10px 0 50px rgba(0,0,0,0.2); transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; }
+        .drawer-container { position: absolute; right: 0; top: 0; bottom: 0; width: 500px; max-width: 95vw; background: white; box-shadow: -10px 0 50px rgba(0,0,0,0.2); transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; }
         .drawer-root.is-open .drawer-container { transform: translateX(0); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body>
@@ -74,15 +74,18 @@
             return <UserContext.Provider value={{...userProfile}}>{children}</UserContext.Provider>;
         };
 
-        // 🌟 修正後的編輯抽屜組件
         const EditDrawer = ({ isOpen, onClose, item, sheetName, onSaved }) => {
             const [formData, setFormData] = useState({});
             const [isSaving, setIsSaving] = useState(false);
             useEffect(() => { if (item) setFormData({...item}); }, [item]);
             
-            const fields = sheetName.includes("本業") 
-                ? ["身分", "姓名", "資格", "備註", "講座", "教學", "聯誼"] 
-                : ["公司名稱", "統編", "負責人", "資格", "備註", "講座", "教學", "聯誼"];
+            // 🌟 補全編輯欄位
+            const fields = useMemo(() => {
+                const common = ["報名次數", "講座", "教學", "聯誼", "備註"];
+                if (sheetName.includes("本業")) return ["身分", "姓名", "資格", ...common];
+                if (sheetName.includes("廠商")) return ["公司名稱", "統編", "負責人", "資格", ...common];
+                return ["姓名", "行動電話", "資格", ...common];
+            }, [sheetName]);
 
             const handleSave = async () => { 
                 setIsSaving(true); 
@@ -96,20 +99,20 @@
                     <div className="drawer-overlay" onClick={onClose}></div>
                     <div className="drawer-container p-8">
                         <div className="flex justify-between items-center mb-6 border-b pb-4">
-                            <h3 className="text-2xl font-black tracking-tight">✏️ 會員資料維護</h3>
+                            <h3 className="text-2xl font-black tracking-tight text-gray-800">✏️ 資料維護</h3>
                             <button onClick={onClose} className="text-gray-400 text-3xl font-bold hover:text-red-500 transition-colors">&times;</button>
                         </div>
                         <div className="flex gap-4 mb-8 pb-6 border-b">
                             <button onClick={onClose} className="flex-1 border-2 py-4 rounded-2xl font-bold text-gray-400 hover:bg-gray-50 transition">取消</button>
                             <button onClick={handleSave} disabled={isSaving} className="flex-[2] bg-blue-600 text-white py-4 rounded-2xl font-black shadow-xl active:scale-95 transition">
-                                {isSaving ? "處理中..." : "確認存檔"}
+                                {isSaving ? "正在存檔..." : "確認存檔"}
                             </button>
                         </div>
-                        <div className="space-y-6 flex-1 overflow-auto pr-2">
+                        <div className="space-y-6 flex-1 overflow-auto pr-2 no-scrollbar">
                             {fields.map(f => (
                                 <div key={f}>
                                     <label className="text-xs font-black text-gray-400 block mb-2 uppercase tracking-widest">{f}</label>
-                                    {f === "備註" ? <textarea className="w-full border-2 p-4 rounded-2xl bg-gray-50 h-40 outline-none focus:border-green-400 font-bold" value={formData[f]||""} onChange={e=>setFormData({...formData,[f]:e.target.value})}/> : 
+                                    {f === "備註" ? <textarea className="w-full border-2 p-4 rounded-2xl bg-gray-50 h-32 outline-none focus:border-green-400 font-bold" value={formData[f]||""} onChange={e=>setFormData({...formData,[f]:e.target.value})}/> : 
                                      f === "資格" ? <select className="w-full border-2 p-4 rounded-2xl bg-gray-50 font-black text-lg focus:border-green-400 outline-none" value={formData[f]||""} onChange={e=>setFormData({...formData, [f]:e.target.value})}><option value="">請選擇</option><option value="Y">Y</option><option value="N">N</option></select> : 
                                      <input className="w-full border-2 p-4 rounded-2xl bg-gray-50 font-black text-lg focus:border-green-400 outline-none" value={formData[f]||""} onChange={e=>setFormData({...formData,[f]:e.target.value})}/>}
                                 </div>
@@ -126,9 +129,29 @@
             useEffect(() => fetchData(), [sheetName]);
             const filtered = data.filter(d => Object.values(d).some(v => String(v).includes(search)));
             
-            const cols = sheetName.includes("本業") 
-                ? [{k:["序號"],l:"序號"},{k:["會員編號"],l:"編號"},{k:["姓名"],l:"姓名"},{k:["資格"],l:"資格"},{k:["報名次數"],l:"報名"},{k:["備註"],l:"備註"}] 
-                : [{k:["序號"],l:"序號"},{k:["公司名稱"],l:"公司"},{k:["負責人"],l:"負責人"},{k:["資格"],l:"資格"},{k:["報名次數"],l:"報名"},{k:["備註"],l:"備註"}];
+            // 🌟 補全顯示欄位：報名次數、講座、教學、聯誼
+            const cols = useMemo(() => {
+                const stats = [
+                    {k:["報名次數"],l:"報名", highlight: true},
+                    {k:["講座類次數","講座"],l:"講座"},
+                    {k:["教學類次數","教學"],l:"教學"},
+                    {k:["聯誼類次數","聯誼"],l:"聯誼"},
+                    {k:["備註"],l:"備註", minWidth: "250px"}
+                ];
+                if (sheetName.includes("本業")) {
+                    return [
+                        {k:["序號"],l:"序"},{k:["會員編號"],l:"編號"},{k:["姓名"],l:"姓名"},{k:["資格"],l:"資"},...stats
+                    ];
+                }
+                if (sheetName.includes("廠商")) {
+                    return [
+                        {k:["序號"],l:"序"},{k:["公司名稱"],l:"公司"},{k:["負責人"],l:"負責人"},{k:["資格"],l:"資"},...stats
+                    ];
+                }
+                return [
+                    {k:["序號"],l:"序"},{k:["姓名"],l:"姓名"},{k:["行動電話"],l:"手機"},{k:["資格"],l:"資"},...stats
+                ];
+            }, [sheetName]);
             
             const gv = (item, keys) => { const k = Object.keys(item).find(key => keys.some(s => key.includes(s))); return k ? item[k] : ""; };
             
@@ -136,10 +159,19 @@
                 <div className="p-8 fade-in">
                     <EditDrawer isOpen={!!editing} item={editing} sheetName={sheetName} onClose={()=>setEditing(null)} onSaved={fetchData} />
                     <div className="flex justify-between mb-8 items-center"><h2 className="text-3xl font-black text-gray-800 tracking-tighter">{title}</h2><div className="flex gap-3"><input placeholder="搜尋..." className="border-2 p-3 rounded-2xl w-80 shadow-sm focus:border-blue-400 outline-none" value={search} onChange={e=>setSearch(e.target.value)}/><button onClick={fetchData} className="bg-white border-2 p-3 rounded-2xl font-bold shadow-sm hover:bg-gray-50 transition">刷新</button></div></div>
-                    <div className="bg-white rounded-[2.5rem] shadow-2xl border overflow-hidden">
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl border overflow-x-auto">
                         <table className="w-full text-sm text-center">
-                            <thead className="bg-gray-50 border-b"><tr>{cols.map((c,i)=><th key={i} className={c.l==="備註"?"min-w-[200px]":""}>{c.l}</th>)}<th>維護</th></tr></thead>
-                            <tbody>{loading ? <tr><td colSpan={cols.length+1} className="p-32 text-gray-300 italic tracking-widest">同步中...</td></tr> : filtered.map((item, idx) => (<tr key={idx} className="border-b hover:bg-gray-50 transition-all">{cols.map((c,ci)=><td key={ci} className={c.l==="報名"?"font-black text-blue-500": (c.l==="備註"?"text-left text-xs max-w-[200px] truncate":"")}>{gv(item, c.k)}</td>)}<td className="p-4"><button onClick={()=>setEditing(item)} className="bg-blue-50 text-blue-600 border-2 border-blue-100 px-4 py-1.5 rounded-xl font-bold text-xs active:scale-90 transition hover:bg-blue-600 hover:text-white">編輯</button></td></tr>))}</tbody>
+                            <thead className="bg-gray-50 border-b"><tr>{cols.map((c,i)=><th key={i} style={c.minWidth?{minWidth:c.minWidth}:{}}>{c.l}</th>)}<th>維護</th></tr></thead>
+                            <tbody>{loading ? <tr><td colSpan={cols.length+1} className="p-32 text-gray-300 italic tracking-widest">資料同步中...</td></tr> : filtered.map((item, idx) => (
+                                <tr key={idx} className="border-b hover:bg-gray-50 transition-all">
+                                    {cols.map((c,ci)=>(
+                                        <td key={ci} className={`${c.highlight ? "font-black text-blue-500" : ""} ${c.l === "備註" ? "text-left text-xs truncate max-w-[250px]" : ""}`}>
+                                            {gv(item, c.k)}
+                                        </td>
+                                    ))}
+                                    <td className="p-4"><button onClick={()=>setEditing(item)} className="bg-blue-50 text-blue-600 border-2 border-blue-100 px-4 py-1.5 rounded-xl font-bold text-xs active:scale-90 transition hover:bg-blue-600 hover:text-white">編輯</button></td>
+                                </tr>
+                            ))}</tbody>
                         </table>
                     </div>
                 </div>
@@ -154,7 +186,7 @@
                 <AuthGuard>
                     <div className="flex h-screen overflow-hidden">
                         <div className="w-80 sidebar-bg text-gray-300 flex flex-col shrink-0 shadow-2xl">
-                            <div className="p-12 border-b border-gray-700 text-[#4ade80] text-4xl font-black text-center italic tracking-tighter uppercase leading-none">TDEA<br/><span className="text-[10px] tracking-widest font-bold opacity-30 not-italic">HUB v13.7</span></div>
+                            <div className="p-12 border-b border-gray-700 text-[#4ade80] text-4xl font-black text-center italic tracking-tighter uppercase leading-none">TDEA<br/><span className="text-[10px] tracking-widest font-bold opacity-30 not-italic uppercase">HUB v13.7</span></div>
                             <nav className="flex-1 mt-10 space-y-2">
                                 <div className={`px-10 py-6 cursor-pointer flex items-center gap-5 transition-all ${view==='dashboard'?'active-item':'menu-item'}`} onClick={()=>setView('dashboard')}><BarChart2/><span>系統總覽</span></div>
                                 <div className={`px-10 py-6 cursor-pointer flex items-center gap-5 transition-all ${view==='activity'?'active-item':'menu-item'}`} onClick={()=>setView('activity')}><ActivityIcon/><span>活動控制中心</span></div>
@@ -165,8 +197,8 @@
                             </nav>
                         </div>
                         <main className="flex-1 overflow-auto bg-[#f8fafc] no-scrollbar">
-                            {view==='dashboard' && <div className="p-8 fade-in"><h2 className="text-3xl font-black mb-10 tracking-tighter italic"><BarChart2/> REAL-TIME DASHBOARD</h2><div className="grid grid-cols-3 gap-8 mb-16"><div className="bg-white p-10 rounded-[2.5rem] shadow-sm text-center border-2 border-green-50"><p className="text-xs text-gray-400 font-bold mb-1">上架活動</p><h3 className="text-6xl font-black text-green-600">{activityData.length}</h3></div><div className="bg-white p-10 rounded-[2.5rem] shadow-sm text-center border-2 border-blue-50"><p className="text-xs text-gray-400 font-bold mb-1">正式會員</p><h3 className="text-6xl font-black text-blue-600">494</h3></div><div className="bg-white p-10 rounded-[2.5rem] shadow-sm text-center border-2 border-purple-50"><p className="text-xs text-gray-400 font-bold mb-1">合作廠商</p><h3 className="text-6xl font-black text-purple-600">31</h3></div></div><div className="bg-white rounded-[2.5rem] shadow-xl overflow-hidden border w-full"><table className="w-full text-center"><thead className="bg-gray-50 border-b"><tr><th className="p-6 text-left pl-12">活動名稱</th><th>當前狀態</th><th>報名人數</th><th>簽到人數</th></tr></thead><tbody>{activityData.map((act,idx)=>(<tr key={idx} className="border-b hover:bg-gray-50 transition-all"><td className="p-6 font-bold text-left pl-12 text-xl text-gray-800">{act['活動名稱']}</td><td><span className="bg-green-100 text-green-700 px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-tighter">ONLINE</span></td><td className="p-6 font-black text-blue-600 text-3xl">{act['報名人數']}</td><td className="p-6 text-gray-500 text-xl font-bold">{act['核銷人數']}</td></tr>))}</tbody></table></div></div>}
-                            {view==='activity' && <div className="p-6 fade-in"><div className="flex justify-between mb-10 items-center"><h2 className="text-3xl font-black italic tracking-tighter">Activity Console</h2><button onClick={fetchActivities} className="bg-blue-600 text-white px-10 py-3 rounded-2xl font-black shadow-xl active:scale-95 transition">刷新清單</button></div><div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border-4 border-white"><table className="w-full text-center"><thead className="bg-gray-100 border-b"><tr><th className="p-6 text-left pl-12">活動名稱 / 起迄時間</th><th>報名</th><th>核銷</th><th className="border-r">狀態</th><th className="min-w-[580px]">操作功能</th></tr></thead><tbody>{activityData.map((act, i) => (<tr key={i} className="border-b hover:bg-gray-50 transition-all"><td className="p-6 text-left pl-12"><div className="font-black text-xl mb-1 text-gray-800">{act['活動名稱']}</div><div className="flex gap-4 items-center"><span className="text-[10px] text-white bg-gray-400 px-2 py-0.5 rounded font-black uppercase tracking-widest">{act['活動類型']}</span><span className="text-[11px] text-purple-600 font-bold italic tracking-tighter">📅 {act['課程時間']} ~ {act['截止日期']}</span></div></td><td className="font-black text-blue-600 text-3xl">{act['報名人數']}</td><td className="text-gray-400 text-xl font-bold border-r">{act['核銷人數']}</td><td className="p-4 whitespace-nowrap text-right pr-12"><div className="flex gap-2 justify-end"><a href={act['報名前端網址']} target="_blank" className="bg-emerald-500 text-white px-5 py-3 rounded-xl font-bold text-xs shadow-lg active:scale-90 transition">網址</a><button className="bg-blue-500 text-white px-5 py-3 rounded-xl font-bold text-xs shadow-lg active:scale-90">明細</button><button className="bg-purple-500 text-white px-5 py-3 rounded-xl font-bold text-xs shadow-lg active:scale-90">分類</button><button className="bg-amber-500 text-white px-5 py-3 rounded-xl font-bold text-xs shadow-lg active:scale-90">抽獎</button><button className="bg-rose-500 text-white px-5 py-3 rounded-xl font-bold text-xs shadow-lg active:scale-90">下架</button></div></td></tr>))}</tbody></table></div></div>}
+                            {view==='dashboard' && <div className="p-8 fade-in"><h2 className="text-3xl font-black mb-10 tracking-tighter italic"><BarChart2/> REAL-TIME MONITORING</h2><div className="grid grid-cols-3 gap-8 mb-16"><div className="bg-white p-10 rounded-[2.5rem] shadow-sm text-center border-2 border-green-50"><p className="text-xs text-gray-400 font-bold mb-1">上架活動</p><h3 className="text-6xl font-black text-green-600">{activityData.length}</h3></div><div className="bg-white p-10 rounded-[2.5rem] shadow-sm text-center border-2 border-blue-50"><p className="text-xs text-gray-400 font-bold mb-1">正式會員</p><h3 className="text-6xl font-black text-blue-600">494</h3></div><div className="bg-white p-10 rounded-[2.5rem] shadow-sm text-center border-2 border-purple-50"><p className="text-xs text-gray-400 font-bold mb-1">合作廠商</p><h3 className="text-6xl font-black text-purple-600">31</h3></div></div><div className="bg-white rounded-[2.5rem] shadow-xl overflow-hidden border w-full"><table className="w-full text-center"><thead className="bg-gray-50 border-b"><tr><th className="p-6 text-left pl-12">活動名稱</th><th>狀態</th><th>報名</th><th>簽到</th></tr></thead><tbody>{activityData.map((act,idx)=>(<tr key={idx} className="border-b hover:bg-gray-50 transition-all"><td className="p-6 font-bold text-left pl-12 text-xl">{act['活動名稱']}</td><td><span className="bg-green-100 text-green-700 px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-tighter">ONLINE</span></td><td className="p-6 font-black text-blue-600 text-3xl">{act['報名人數']}</td><td className="p-6 text-gray-500 text-xl font-bold">{act['核銷人數']}</td></tr>))}</tbody></table></div></div>}
+                            {view==='activity' && <div className="p-6 fade-in"><div className="flex justify-between mb-10 items-center"><h2 className="text-3xl font-black italic tracking-tighter">Activity Console</h2><button onClick={fetchActivities} className="bg-blue-600 text-white px-10 py-3 rounded-2xl font-black shadow-xl active:scale-95 transition">刷新清單</button></div><div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border-4 border-white"><table className="w-full text-center"><thead className="bg-gray-100 border-b"><tr><th className="p-6 text-left pl-12">名稱 / 起迄時間</th><th>報名</th><th>核銷</th><th className="border-r">狀態</th><th className="min-w-[580px]">操作功能</th></tr></thead><tbody>{activityData.map((act, i) => (<tr key={i} className="border-b hover:bg-gray-50 transition-all"><td className="p-6 text-left pl-12"><div className="font-black text-xl mb-1 text-gray-800">{act['活動名稱']}</div><div className="flex gap-4 items-center"><span className="text-[10px] text-white bg-gray-400 px-2 py-0.5 rounded font-black uppercase tracking-widest">{act['活動類型']}</span><span className="text-[11px] text-purple-600 font-bold italic tracking-tighter">📅 {act['課程時間']} ~ {act['截止日期']}</span></div></td><td className="font-black text-blue-600 text-3xl">{act['報名人數']}</td><td className="text-gray-400 text-xl font-bold border-r">{act['核銷人數']}</td><td className="p-4 whitespace-nowrap text-right pr-12"><div className="flex gap-2 justify-end"><a href={act['報名前端網址']} target="_blank" className="bg-emerald-500 text-white px-5 py-3 rounded-xl font-bold text-xs shadow-lg active:scale-90 transition">網址</a><button className="bg-blue-500 text-white px-5 py-3 rounded-xl font-bold text-xs shadow-lg active:scale-90">明細</button><button className="bg-purple-500 text-white px-5 py-3 rounded-xl font-bold text-xs shadow-lg active:scale-90">分類</button><button className="bg-amber-500 text-white px-5 py-3 rounded-xl font-bold text-xs shadow-lg active:scale-90">抽獎</button><button className="bg-rose-500 text-white px-5 py-3 rounded-xl font-bold text-xs shadow-lg active:scale-90">下架</button></div></td></tr>))}</tbody></table></div></div>}
                             {view==='assoc' && <MemberTable title="協會正式會員管理" sheetName="本業會員" />}
                             {view==='vendor' && <MemberTable title="廠商贊助單位管理" sheetName="廠商會員" />}
                             {view==='guest' && <MemberTable title="一般註冊名冊管理" sheetName="一般會員" />}
