@@ -2,112 +2,319 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TDEA 系統管理中心</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TDEA 管理中心</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <style>
-        body { background-color: #f3f4f6; font-family: "Microsoft JhengHei", sans-serif; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
+        body { background-color: #f3f4f6; font-family: "Microsoft JhengHei", sans-serif; overflow-x: hidden; }
         .sidebar-bg { background-color: #2d333b; }
         .active-item { background-color: #243b32; border-left: 4px solid #4ade80; color: #4ade80; }
         .menu-item:hover:not(.active-item) { background-color: #3d444d; }
-        table th { text-align: center !important; white-space: nowrap; font-size: 13px; font-weight: 800; color: #6b7280; padding: 15px; border-bottom: 2px solid #edf2f7; background-color: #f9fafb; }
-        table td { text-align: center !important; font-size: 14px; padding: 12px 8px; border-bottom: 1px solid #f3f4f6; }
         .fade-in { animation: fadeIn 0.4s forwards; }
         @keyframes fadeIn { from{opacity:0; transform: translateY(10px);} to{opacity:1; transform: translateY(0);} }
-        .drawer-root { position: fixed; inset: 0; z-index: 9999; pointer-events: none; visibility: hidden; }
+        /* 抽屜與彈窗樣式 */
+        .drawer-root { position: fixed; inset: 0; z-index: 50; pointer-events: none; visibility: hidden; }
         .drawer-root.is-open { pointer-events: auto; visibility: visible; }
-        .drawer-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); opacity: 0; transition: opacity 0.3s; backdrop-filter: blur(2px); }
+        .drawer-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); opacity: 0; transition: opacity 0.3s; }
         .drawer-root.is-open .drawer-overlay { opacity: 1; }
         .drawer-container { position: absolute; right: 0; top: 0; bottom: 0; width: 550px; max-width: 95vw; background: white; transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; box-shadow: -10px 0 50px rgba(0,0,0,0.2); }
         .drawer-root.is-open .drawer-container { transform: translateX(0); }
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        .lottery-screen { position: fixed; inset: 0; background: white; z-index: 200; overflow: auto; display: flex; flex-direction: column; align-items: center; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
+        table th { padding: 15px; white-space: nowrap; font-size: 13px; color: #6b7280; font-weight: 800; border-bottom: 2px solid #e5e7eb; background: #f9fafb; }
+        table td { padding: 12px; font-size: 14px; border-bottom: 1px solid #f3f4f6; }
     </style>
 </head>
 <body>
     <div id="root"></div>
+
     <script type="text/babel">
-        const { useState, useEffect, useContext, createContext, Fragment, useMemo } = window.React;
-        const LIFF_ID = "2005868456-cfANNVou"; 
-        const API_URL = "https://tdea.fangwl591021.workers.dev/"; 
+        // ---------------------------------------------------------
+        // 1. 全域變數與工具 (Global Setup)
+        // ---------------------------------------------------------
+        const { useState, useEffect, useContext, createContext, Fragment, useMemo } = React;
+        const LIFF_ID = "2005868456-cfANNVou";
+        const API_URL = "https://tdea.fangwl591021.workers.dev/";
         const AuthContext = createContext(null);
 
-        // 🌟 核心圖示組件 (解決 ChevronDown 未定義)
-        const IconBase = ({children}) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{display:'inline-block', verticalAlign:'middle'}}>{children}</svg>;
-        const BarChart2 = () => <IconBase><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></IconBase>;
-        const Users = () => <IconBase><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></IconBase>;
-        const ActivityIcon = () => <IconBase><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></IconBase>;
-        const ChevronDown = () => <IconBase><polyline points="6 9 12 15 18 9"/></IconBase>;
-
+        // API 呼叫工具
         async function callAPI(action, data = {}) {
             try {
-                const response = await fetch(`${API_URL}?t=${new Date().getTime()}`, { 
+                const response = await fetch(`${API_URL}?t=${new Date().getTime()}`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action, ...data }) 
+                    body: JSON.stringify({ action, ...data })
                 });
                 return await response.json();
             } catch (err) { return { success: false, message: "連線失敗" }; }
         }
 
-        const AuthProvider = ({ children }) => {
-            const [authState, setAuthState] = useState({ status: "LOADING", user: null, role: null });
-            const initAuth = async () => {
-                try {
-                    await liff.init({ liffId: LIFF_ID });
-                    if (!liff.isLoggedIn()) { liff.login(); return; }
-                    const profile = await liff.getProfile();
-                    const res = await callAPI('check', { userId: profile.userId });
-                    if (res.status === 'admin' || res.status === 'member') {
-                        setAuthState({ status: "AUTHORIZED", user: profile, role: res.status });
-                    } else {
-                        window.location.replace("login.html");
-                    }
-                } catch (err) { setAuthState({ status: "ERROR" }); }
-            };
-            useEffect(() => { initAuth(); }, []);
-            if (authState.status === "LOADING") return <div className="h-screen flex items-center justify-center font-black text-gray-400 italic">TDEA SYNCING...</div>;
-            return <AuthContext.Provider value={authState}>{children}</AuthContext.Provider>;
-        };
+        // 圖示組件 (Function Components)
+        function IconBase({children}) { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{display:'inline-block', verticalAlign:'middle'}}>{children}</svg>; }
+        function BarChart2() { return <IconBase><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></IconBase>; }
+        function Users() { return <IconBase><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></IconBase>; }
+        function ActivityIcon() { return <IconBase><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></IconBase>; }
+        function ChevronDown() { return <IconBase><polyline points="6 9 12 15 18 9"/></IconBase>; }
 
-        const CreateActivityModal = ({ isOpen, onClose, onSaved }) => {
-            const [form, setForm] = useState({ name: '', type: '講座類', courseTime: '', deadline: '', capacity: '20', needMeal: false });
-            const [loading, setLoading] = useState(false);
-            if (!isOpen) return null;
-            const handleSubmit = async () => {
-                if (!form.name) return alert("請輸入活動名稱");
-                setLoading(true);
-                const res = await callAPI('createNewActivityWithForm', { form });
-                setLoading(false);
-                if (res.success) { alert("✨ 創建成功！"); onSaved(); onClose(); setForm({ name: '', type: '講座類', courseTime: '', deadline: '', capacity: '20', needMeal: false }); } 
-                else { alert("失敗: " + res.message); }
-            };
+        // ---------------------------------------------------------
+        // 2. 核心應用程式入口 (Main App Entry)
+        // ---------------------------------------------------------
+        function App() {
             return (
-                <div className="modal-overlay">
-                    <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl p-8 space-y-4 mx-4">
-                        <div className="flex justify-between items-center font-black text-2xl border-b pb-4">✨ 創建活動<button onClick={onClose}>&times;</button></div>
-                        <div className="space-y-4">
-                            <div><label className="text-xs font-bold text-gray-400 uppercase">活動名稱</label><input className="w-full border-2 p-3 rounded-xl font-bold" value={form.name} onChange={e=>setForm({...form, name:e.target.value})}/></div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div><label className="text-xs font-bold text-gray-400">類型</label><select className="w-full border-2 p-3 rounded-xl font-bold bg-white" value={form.type} onChange={e=>setForm({...form, type:e.target.value})}><option>講座類</option><option>教學類</option><option>聯誼類</option><option>其他</option></select></div>
-                                <div><label className="text-xs font-bold text-gray-400">限額</label><input type="number" className="w-full border-2 p-3 rounded-xl" value={form.capacity} onChange={e=>setForm({...form, capacity:e.target.value})}/></div>
+                <AuthProvider>
+                    <Router />
+                </AuthProvider>
+            );
+        }
+
+        // 路由切換器 (Router)
+        function Router() {
+            const { role } = useContext(AuthContext);
+            if (role === 'loading') return <div className="h-screen flex items-center justify-center italic text-gray-400 font-bold uppercase tracking-widest">System Loading...</div>;
+            if (role === 'member') return <MemberLobby />;
+            if (role === 'admin') return <AdminConsole />;
+            return <div className="h-screen flex items-center justify-center font-bold text-red-400">權限驗證失敗，請重新登入</div>;
+        }
+
+        // 權限驗證提供者 (Auth Provider)
+        function AuthProvider({ children }) {
+            const [authState, setAuthState] = useState({ role: 'loading', user: null });
+            useEffect(() => {
+                const init = async () => {
+                    try {
+                        await liff.init({ liffId: LIFF_ID });
+                        if (!liff.isLoggedIn()) { liff.login(); return; }
+                        const p = await liff.getProfile();
+                        const res = await callAPI('check', { userId: p.userId });
+                        if (res.status === 'admin' || res.status === 'member') {
+                            setAuthState({ role: res.status, user: p });
+                        } else {
+                            window.location.replace("login.html");
+                        }
+                    } catch (err) { console.error(err); }
+                };
+                init();
+            }, []);
+            return <AuthContext.Provider value={authState}>{children}</AuthContext.Provider>;
+        }
+
+        // ---------------------------------------------------------
+        // 3. 管理員後台 (Admin Console)
+        // ---------------------------------------------------------
+        function AdminConsole() {
+            const [view, setView] = useState('dashboard');
+            const [data, setData] = useState([]);
+            const [expandedMenu, setExpandedMenu] = useState(false);
+            
+            // 狀態：選中的項目
+            const [selectedDetail, setSelectedDetail] = useState(null); // 明細
+            const [isCreateOpen, setCreateOpen] = useState(false); // 創建
+            const [lotTarget, setLotTarget] = useState(null); // 抽獎
+            const [reTarget, setReTarget] = useState(null); // 分類
+
+            const refresh = () => callAPI('getActivityList').then(res => setData(res.data || []));
+            useEffect(() => { refresh(); }, []);
+
+            return (
+                <div className="flex h-screen overflow-hidden">
+                    {/* 側邊欄 */}
+                    <div className="w-80 sidebar-bg text-gray-300 flex flex-col shrink-0 shadow-2xl">
+                        <div className="p-12 border-b border-gray-700 text-[#4ade80] text-4xl font-black text-center italic tracking-tighter">TDEA<br/><span className="text-[10px] tracking-widest font-bold opacity-30 not-italic uppercase">ADMIN v16.2</span></div>
+                        <nav className="flex-1 mt-10 space-y-2">
+                            <div className={`px-10 py-6 cursor-pointer flex items-center gap-5 transition-all ${view==='dashboard'?'active-item':'menu-item'}`} onClick={()=>{setView('dashboard');setSelectedDetail(null);}}><BarChart2/><span>數據總覽</span></div>
+                            <div className={`px-10 py-6 cursor-pointer flex items-center gap-5 transition-all ${view==='activity'?'active-item':'menu-item'}`} onClick={()=>{setView('activity');setSelectedDetail(null);}}><ActivityIcon/><span>活動控制</span></div>
+                            <div className={`px-10 py-6 cursor-pointer flex items-center justify-between menu-item transition-all ${['assoc','vendor','guest'].includes(view)?'text-green-400':''}`} onClick={() => setExpandedMenu(!expandedMenu)}>
+                                <div className="flex items-center gap-5"><Users/><span>名冊管理</span></div><div className={`transition-transform duration-300 ${expandedMenu?'rotate-180':''}`}><ChevronDown/></div>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div><label className="text-xs font-bold text-gray-400">開課日期</label><input className="w-full border-2 p-3 rounded-xl font-bold" placeholder="YYYY-MM-DD" value={form.courseTime} onChange={e=>setForm({...form, courseTime:e.target.value})}/></div>
-                                <div><label className="text-xs font-bold text-gray-400">截止日期</label><input className="w-full border-2 p-3 rounded-xl font-bold" placeholder="YYYY-MM-DD" value={form.deadline} onChange={e=>setForm({...form, deadline:e.target.value})}/></div>
+                            {expandedMenu && (<div className="bg-[#24292f] border-l-8 border-[#243b32] transition-all duration-300 overflow-hidden"><div onClick={()=>{setView('assoc');setSelectedDetail(null);}} className={`px-16 py-4 cursor-pointer text-sm font-bold ${view==='assoc'?'text-green-400 bg-[#243b32]':'text-gray-500 hover:text-white'}`}>協會會員</div><div onClick={()=>{setView('vendor');setSelectedDetail(null);}} className={`px-16 py-4 cursor-pointer text-sm font-bold ${view==='vendor'?'text-green-400 bg-[#243b32]':'text-gray-500 hover:text-white'}`}>廠商會員</div><div onClick={()=>{setView('guest');setSelectedDetail(null);}} className={`px-16 py-4 cursor-pointer text-sm font-bold ${view==='guest'?'text-green-400 bg-[#243b32]':'text-gray-500 hover:text-white'}`}>一般註冊</div></div>)}
+                        </nav>
+                    </div>
+                    
+                    {/* 主畫面 */}
+                    <main className="flex-1 overflow-auto bg-[#f8fafc] no-scrollbar">
+                        {/* 彈窗組件掛載區 */}
+                        <CreateActivityModal isOpen={isCreateOpen} onClose={()=>setCreateOpen(false)} onSaved={refresh} />
+                        <LotteryDrawer isOpen={!!lotTarget} activity={lotTarget} onClose={()=>setLotTarget(null)} onDataChange={refresh} />
+                        <ReclassifyModal isOpen={!!reTarget} activity={reTarget} onClose={()=>setReTarget(null)} onRefresh={refresh} />
+
+                        {selectedDetail ? <DetailPage activity={selectedDetail} onBack={()=>setSelectedDetail(null)} onRefresh={refresh} /> : (
+                            <Fragment>
+                                {view === 'dashboard' && <DashboardView data={data} />}
+                                {view === 'activity' && <ActivityListView data={data} onRefresh={refresh} setCreateOpen={setCreateOpen} setSelectedDetail={setSelectedDetail} setLotTarget={setLotTarget} setReTarget={setReTarget} />}
+                                {view === 'assoc' && <MemberTable title="協會正式會員名冊" sheetName="本業會員" />}
+                                {view === 'vendor' && <MemberTable title="廠商贊助單位名冊" sheetName="廠商會員" />}
+                                {view === 'guest' && <MemberTable title="一般註冊名冊" sheetName="一般會員" />}
+                            </Fragment>
+                        )}
+                    </main>
+                </div>
+            );
+        }
+
+        // ---------------------------------------------------------
+        // 4. 會員大廳 (Member Lobby)
+        // ---------------------------------------------------------
+        function MemberLobby() {
+            const { user } = useContext(AuthContext);
+            const [view, setView] = useState('lobby');
+            const [activities, setActivities] = useState([]);
+            const [history, setHistory] = useState([]);
+            const [loading, setLoading] = useState(true);
+
+            const fetchData = async () => {
+                setLoading(true);
+                if (view === 'lobby') { 
+                    const res = await callAPI('getActivityList'); 
+                    setActivities((res.data || []).filter(x => x.狀態 === '上架')); 
+                } else { 
+                    const res = await callAPI('getUserRegistrations', { userId: user.userId }); 
+                    setHistory(res.data || []); 
+                }
+                setLoading(false);
+            };
+            useEffect(() => { fetchData(); }, [view]);
+
+            const handleRegister = async (act) => {
+                let meal = "";
+                if (act.葷素 === "Y") {
+                    meal = prompt("請輸入用餐需求：\n葷食 / 素食 / 不需用餐");
+                    if (meal === null) return; if (!meal) meal = "無需求";
+                }
+                if (!confirm(`報名「${act['活動名稱']}」?`)) return;
+                const res = await callAPI('registerForActivity', { userId: user.userId, activityId: act['活動試算表ID'], meal: meal });
+                if (res.success) { alert("🎉 報名成功！"); setView('history'); } else { alert(res.message); }
+            };
+
+            return (
+                <div className="p-4 max-w-2xl mx-auto space-y-6 fade-in pb-20">
+                    <div className="bg-emerald-600 p-8 rounded-[3rem] shadow-xl text-white flex items-center gap-6">
+                        <img src={user.pictureUrl} className="w-20 h-20 rounded-full border-4 border-white/20 shadow-lg" />
+                        <div><p className="opacity-80 uppercase text-xs font-bold mb-1">歡迎進入</p><h1 className="text-3xl font-black">{user.displayName}</h1></div>
+                    </div>
+                    <div className="flex bg-white p-2 rounded-2xl shadow-md border-2 border-white">
+                        <button onClick={()=>setView('lobby')} className={`flex-1 py-3 rounded-xl font-bold transition ${view==='lobby'?'bg-emerald-500 text-white shadow-lg':'text-gray-400'}`}>📢 活動報名</button>
+                        <button onClick={()=>setView('history')} className={`flex-1 py-3 rounded-xl font-bold transition ${view==='history'?'bg-emerald-500 text-white shadow-lg':'text-gray-400'}`}>📂 我的紀錄</button>
+                    </div>
+                    <div className="bg-white p-6 rounded-[3rem] shadow-xl border-4 border-white min-h-[400px]">
+                        {loading ? <div className="p-20 text-center text-gray-300 font-bold">載入中...</div> : (
+                            <div className="space-y-4">
+                                {view === 'lobby' ? activities.map((act, i) => (
+                                    <div key={i} className="flex justify-between items-center p-6 bg-gray-50 rounded-2xl border">
+                                        <div><div className="font-bold text-lg text-gray-800">{act['活動名稱']}</div><div className="text-xs text-gray-400 mt-1 font-bold">📅 {act['課程時間']}</div></div>
+                                        <button onClick={() => handleRegister(act)} className="bg-emerald-600 text-white px-8 py-3 rounded-2xl font-bold shadow-lg">報名</button>
+                                    </div>
+                                )) : history.map((reg, i) => (
+                                    <div key={i} className="p-6 bg-gray-50 rounded-2xl border flex flex-col gap-2 relative overflow-hidden border-emerald-100">
+                                        <div className="text-xs font-black text-emerald-600 uppercase mb-1">報名成功</div>
+                                        <div className="font-bold text-lg text-gray-800">{reg.name}</div>
+                                        <div className="flex justify-between items-end"><div className="text-xs text-gray-400 font-bold">日期: {reg.time}</div><div className="px-4 py-1.5 rounded-full text-xs font-black bg-green-100 text-green-700">{reg.status}</div></div>
+                                    </div>
+                                ))}
                             </div>
-                            <div className="pt-2"><label className="flex items-center gap-3 p-4 border-2 rounded-2xl bg-gray-50 cursor-pointer active:scale-95 transition-all"><input type="checkbox" className="w-5 h-5 accent-green-600" checked={form.needMeal} onChange={e=>setForm({...form, needMeal:e.target.checked})}/><span className="font-bold text-gray-700 uppercase">提供餐點？ (葷素調查)</span></label></div>
-                        </div>
-                        <div className="pt-4 flex gap-3"><button onClick={onClose} className="flex-1 py-4 border-2 rounded-2xl font-bold">取消</button><button onClick={handleSubmit} disabled={loading} className="flex-[2] bg-green-600 text-white py-4 rounded-2xl font-black shadow-lg">確認創建</button></div>
+                        )}
                     </div>
                 </div>
             );
-        };
+        }
 
-        const EditDrawer = ({ isOpen, onClose, item, sheetName, onSaved, cols }) => {
+        // ---------------------------------------------------------
+        // 5. 獨立組件區 (Components)
+        // ---------------------------------------------------------
+        
+        function DashboardView({ data }) {
+            const stats = { act: data.filter(x=>x.狀態==='上架').length, assoc: 494, vendor: 31 };
+            return (
+                <div className="p-8 fade-in">
+                    <h2 className="text-2xl font-black mb-10 tracking-widest text-gray-700 uppercase">Global Monitor</h2>
+                    <div className="grid grid-cols-3 gap-8 mb-16">
+                        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm text-center border-2 border-green-50"><p className="text-xs text-gray-400 font-bold mb-1">上架活動</p><h3 className="text-3xl font-black text-green-600">{stats.act}</h3></div>
+                        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm text-center border-2 border-blue-50"><p className="text-xs text-gray-400 font-bold mb-1">協會會員</p><h3 className="text-3xl font-black text-blue-600">{stats.assoc}</h3></div>
+                        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm text-center border-2 border-purple-50"><p className="text-xs text-gray-400 font-bold mb-1">贊助廠商</p><h3 className="text-3xl font-black text-purple-600">{stats.vendor}</h3></div>
+                    </div>
+                </div>
+            );
+        }
+
+        function ActivityListView({ data, onRefresh, setCreateOpen, setSelectedDetail, setLotTarget, setReTarget }) {
+            const handleTakeDown = async (n) => { if(confirm(`下架「${n}」?`)) { await callAPI('updateActivityStatus',{name:n,status:'下架'}); onRefresh(); } };
+            return (
+                <div className="p-6 fade-in">
+                    <div className="flex justify-between mb-10 items-center"><div className="flex gap-4"><button onClick={()=>setCreateOpen(true)} className="bg-green-600 text-white px-8 py-3 rounded-2xl font-black shadow-lg">✨ 創建活動</button><h2 className="text-3xl font-black text-gray-700 italic uppercase ml-4 self-center">Activity Console</h2></div><button onClick={onRefresh} className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-black shadow-lg">同步</button></div>
+                    <div className="bg-white rounded-[2.5rem] shadow-xl border-4 border-white overflow-hidden text-center"><table className="w-full text-sm">
+                        <thead className="bg-gray-100 border-b"><tr><th className="p-6 text-left pl-12">名稱</th><th className="w-24">報名</th><th className="w-24">核銷</th><th className="w-24">狀態</th><th className="min-w-[550px]">操作</th></tr></thead>
+                        <tbody>{data.map((act, i) => (
+                            <tr key={i} className="border-b hover:bg-gray-50 transition-all">
+                                <td className="p-6 text-left pl-12"><div className="font-black text-xl mb-1">{act['活動名稱']}</div><div className="text-xs text-gray-400 font-bold uppercase tracking-widest">{act['狀態']} MONITOR</div></td>
+                                <td className="font-black text-blue-600 text-3xl">{act['報名人數']}</td><td className="text-gray-400 text-xl font-bold">{act['核銷人數']||0}</td>
+                                <td><span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase ${act.狀態==='上架'?'bg-green-100 text-green-700':'bg-gray-100'}`}>{act.狀態==='上架'?'ONLINE':'OFF'}</span></td>
+                                <td className="p-4 whitespace-nowrap text-right pr-12"><div className="flex gap-2 justify-end">
+                                    <a href={act['報名前端網址']} target="_blank" className="bg-emerald-500 text-white px-5 py-2 rounded-xl font-bold text-xs shadow-md">網址</a>
+                                    <button onClick={()=>setSelectedDetail(act)} className="bg-blue-500 text-white px-5 py-2 rounded-xl font-bold text-xs shadow-md">明細</button>
+                                    <button onClick={()=>setReTarget(act)} className="bg-purple-500 text-white px-5 py-2 rounded-xl font-bold text-xs shadow-md">分類</button>
+                                    <button onClick={()=>setLotTarget(act)} className="bg-amber-500 text-white px-5 py-2 rounded-xl font-bold text-xs shadow-md">抽獎</button>
+                                    <button onClick={()=>handleTakeDown(act['活動名稱'])} className={`bg-rose-500 text-white px-5 py-2 rounded-xl font-bold text-xs shadow-md ${act.狀態==='上架'?'':'opacity-50'}`}>下架</button>
+                                </div></td>
+                            </tr>
+                        ))}</tbody>
+                    </table></div>
+                </div>
+            );
+        }
+
+        // 🌟 明細頁面 (Detail Page)
+        function DetailPage({ activity, onBack, onRefresh }) {
+            const [data, setData] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const fetchList = () => { setLoading(true); callAPI('getActivityDetails', { id: activity['活動試算表ID'] }).then(res => { setData(res || []); setLoading(false); }); };
+            useEffect(() => { fetchList(); }, []);
+            const handleToggle = async (row, status) => { const res = await callAPI('toggleCheckInStatus', { id: activity['活動試算表ID'], row, status }); if(res.success) fetchList(); onRefresh(); };
+            return (
+                <div className="p-8 fade-in">
+                    <button onClick={onBack} className="bg-white border-2 px-6 py-2 rounded-2xl font-black text-gray-400 mb-6">← 返回</button>
+                    <h2 className="text-2xl font-black mb-6 italic">📂 報名明細：{activity['活動名稱']}</h2>
+                    <div className="bg-white rounded-3xl shadow-xl border-4 border-white overflow-hidden">
+                        {loading ? <div className="p-20 text-center animate-pulse italic text-gray-400 font-black">Syncing...</div> : (
+                            <table className="w-full text-center"><thead className="bg-gray-50 border-b"><tr><th>姓名</th><th>手機</th><th>狀態</th><th>簽到</th></tr></thead>
+                                <tbody>{data.length === 0 ? <tr><td colSpan="4" className="p-10 text-gray-300 italic">無資料</td></tr> : data.map((r, i) => (
+                                    <tr key={i} className="border-b hover:bg-gray-50"><td className="p-6 font-black">{r.姓名}</td><td className="p-6 font-mono">{r.電話}</td><td className="p-6 text-green-600 font-bold">{r.核銷狀態}</td><td className="p-6"><button onClick={() => handleToggle(r._row, r.核銷狀態)} className="px-8 py-2 rounded-xl text-white font-bold bg-blue-600 shadow-md">簽到/取消</button></td></tr>
+                                ))}</tbody>
+                            </table>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // 🌟 名冊表格 (Member Table)
+        function MemberTable({ title, sheetName }) {
+            const [data, setData] = useState([]), [loading, setLoading] = useState(true), [search, setSearch] = useState(""), [editing, setEditing] = useState(null);
+            const fetchData = () => { setLoading(true); callAPI('getMemberData', { sheetName }).then(res => { setData(res.data || []); setLoading(false); }); };
+            useEffect(() => fetchData(), [sheetName]);
+            const filtered = data.filter(d => Object.values(d).some(v => String(v).includes(search)));
+            const cols = useMemo(() => {
+                const common = [{k:["活動報名次數"],l:"報名",h:true},{k:["講座類次數"],l:"講座"},{k:["教學類次數"],l:"教學"},{k:["聯誼類次數"],l:"聯誼"},{k:["備註"],l:"備註",mw:"200px"}];
+                if (sheetName.includes("本業")) return [{k:["序號"],l:"序號"},{k:["會員編號"],l:"編號"},{k:["姓名"],l:"姓名"},{k:["會員資格"],l:"資格"},...common];
+                if (sheetName.includes("廠商")) return [{k:["序號"],l:"序號"},{k:["會員編號"],l:"編號"},{k:["公司名稱"],l:"公司"},{k:["公司負責人"],l:"負責人"},{k:["會員資格"],l:"資格"},...common];
+                return [{k:["序號"],l:"序號"},{k:["姓名"],l:"姓名"},{k:["行動電話"],l:"手機"},{k:["會員資格"],l:"資格"},...common];
+            }, [sheetName]);
+            const gv = (item, keys) => { const k = Object.keys(item).find(key => keys.some(s => key.includes(s))); return k ? item[k] : ""; };
+            return (
+                <div className="p-8 fade-in">
+                    <EditDrawer isOpen={!!editing} item={editing} sheetName={sheetName} onClose={()=>setEditing(null)} onSaved={fetchData} cols={cols} />
+                    <div className="flex justify-between items-center mb-8"><h2 className="text-3xl font-black text-gray-800">{title}</h2><input placeholder="搜尋..." className="border-2 p-3 rounded-2xl w-80 shadow-sm" value={search} onChange={e=>setSearch(e.target.value)}/></div>
+                    <div className="bg-white rounded-[2.5rem] shadow-xl overflow-x-auto border-4 border-white"><table className="w-full text-sm text-center"><thead><tr className="bg-gray-50 border-b">{cols.map((c,i)=><th key={i} className="whitespace-nowrap uppercase tracking-widest">{c.l}</th>)}<th>維護</th></tr></thead><tbody>{loading ? <tr><td colSpan={20} className="p-32 italic font-black text-gray-300">Syncing...</td></tr> : filtered.map((item, idx) => (
+                        <tr key={idx} className="border-b hover:bg-gray-50 transition-all">{cols.map((c,ci)=><td key={ci} className={c.h?"font-black text-blue-500":""}>{gv(item, c.k)}</td>)}<td className="p-4"><button onClick={()=>setEditing(item)} className="bg-blue-50 text-blue-600 border-2 px-4 py-1.5 rounded-xl font-bold text-xs">編輯</button></td></tr>
+                    ))}</tbody></table></div>
+                </div>
+            );
+        }
+
+        // 🌟 編輯抽屜 (Edit Drawer)
+        function EditDrawer({ isOpen, onClose, item, sheetName, onSaved, cols }) {
             const [formData, setFormData] = useState({});
             const [isSaving, setIsSaving] = useState(false);
             useEffect(() => { if (item) setFormData({...item}); }, [item]);
@@ -117,154 +324,102 @@
                 <div className={`drawer-root ${isOpen ? 'is-open' : ''}`} style={{visibility: isOpen?'visible':'hidden'}}>
                     <div className="drawer-overlay" onClick={onClose}></div>
                     <div className="drawer-container p-8">
-                        <h3 className="text-2xl font-black mb-6 border-b pb-4">✏️ 編輯資料</h3>
-                        <div className="flex gap-3 mb-8"><button onClick={onClose} className="flex-1 py-4 border-2 rounded-2xl font-bold text-gray-400">取消返回</button><button onClick={handleSave} className="flex-[2] bg-blue-600 text-white py-4 rounded-2xl font-black shadow-xl">確認存檔</button></div>
-                        <div className="space-y-4 overflow-auto flex-1 no-scrollbar pr-2">
-                            {fields.map(f => (<div key={f}><label className="text-xs font-bold text-gray-400 block mb-1 uppercase">{f}</label>{f.includes("備註")?<textarea className="w-full border-2 p-3 rounded-xl h-24 font-bold" value={formData[f]||""} onChange={e=>setFormData({...formData,[f]:e.target.value})}/>:<input className="w-full border-2 p-3 rounded-xl font-bold" value={formData[f]||""} onChange={e=>setFormData({...formData,[f]:e.target.value})}/>}</div>))}
-                        </div>
+                        <div className="flex justify-between items-center mb-6 border-b pb-4"><h3 className="text-2xl font-black">✏️ 編輯資料</h3><button onClick={onClose} className="text-3xl text-gray-300 hover:text-red-500">&times;</button></div>
+                        <div className="flex gap-3 mb-8"><button onClick={onClose} className="flex-1 py-4 border-2 rounded-2xl font-bold">取消</button><button onClick={handleSave} className="flex-[2] bg-blue-600 text-white py-4 rounded-2xl font-black shadow-lg">{isSaving?"存檔...":"確認存檔"}</button></div>
+                        <div className="space-y-4 overflow-auto flex-1 no-scrollbar pr-2">{fields.map(f => (<div key={f}><label className="text-xs font-bold text-gray-400 block mb-1 uppercase">{f}</label>{f.includes("備註")?<textarea className="w-full border-2 p-3 rounded-xl h-24 font-bold" value={formData[f]||""} onChange={e=>setFormData({...formData,[f]:e.target.value})}/>:<input className="w-full border-2 p-3 rounded-xl font-bold" value={formData[f]||""} onChange={e=>setFormData({...formData,[f]:e.target.value})}/>}</div>))}</div>
                     </div>
                 </div>
             );
-        };
+        }
 
-        const DetailPage = ({ activity, onBack, onRefresh }) => {
-            const [data, setData] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const fetchList = () => { setLoading(true); callAPI('getActivityDetails', { id: activity['活動試算表ID'] }).then(res => { setData(res || []); setLoading(false); }); };
-            useEffect(() => { if(activity) fetchList(); }, [activity]);
-            const handleToggle = async (row, status) => { const res = await callAPI('toggleCheckInStatus', { id: activity['活動試算表ID'], row, status }); if(res.success) fetchList(); onRefresh(); };
-            return (
-                <div className="p-8 fade-in">
-                    <button onClick={onBack} className="bg-white border-2 px-6 py-2 rounded-2xl font-black text-gray-400 mb-6 shadow-sm active:scale-95 transition">← 返回</button>
-                    <h2 className="text-2xl font-black mb-6 italic">📂 報名明細：{activity['活動名稱']}</h2>
-                    <div className="bg-white rounded-3xl shadow-xl border-4 border-white overflow-hidden text-center">
-                        {loading ? <div className="p-20 italic text-gray-400 font-black animate-pulse">Syncing Details...</div> : (
-                            <table className="w-full">
-                                <thead className="bg-gray-50 border-b"><tr><th>姓名</th><th>手機</th><th>狀態</th><th>簽到</th></tr></thead>
-                                <tbody>{data.map((r, i) => (<tr key={i} className="border-b"><td className="p-6 font-black">{r.姓名}</td><td className="p-6">{r.電話}</td><td className="p-6">{r.核銷狀態}</td><td className="p-6"><button onClick={() => handleToggle(r._row, r.核銷狀態)} className={`px-10 py-3 rounded-2xl text-white font-black shadow-lg ${r.核銷狀態 === "未簽到" ? 'bg-blue-600' : 'bg-gray-400'}`}>{r.核銷狀態 === "未簽到" ? "簽到" : "取消"}</button></td></tr>))}</tbody>
-                            </table>
-                        )}
-                    </div>
-                </div>
-            );
-        };
-
-        const MemberTable = ({ title, sheetName }) => {
-            const [data, setData] = useState([]), [loading, setLoading] = useState(true), [search, setSearch] = useState(""), [editing, setEditing] = useState(null);
-            const fetchData = () => { setLoading(true); callAPI('getMemberData', { sheetName }).then(res => { setData(res.data || []); setLoading(false); }); };
-            useEffect(() => fetchData(), [sheetName]);
-            const filtered = data.filter(d => Object.values(d).some(v => String(v).includes(search)));
-            const cols = useMemo(() => {
-                const stats = [{k:["活動報名次數"],l:"活動報名次數",h:true},{k:["講座類次數"],l:"講座類次數"},{k:["教學類次數"],l:"教學類次數"},{k:["聯誼類次數"],l:"聯誼類次數"},{k:["備註"],l:"備註",mw:"250px"}];
-                if (sheetName.includes("本業")) return [{k:["序號"],l:"序號"},{k:["會員編號"],l:"會員編號"},{k:["身分"],l:"身分"},{k:["姓名"],l:"姓名"},{k:["性別"],l:"性別"},{k:["會員資格(Y/N)"],l:"會員資格(Y/N)"},...stats];
-                if (sheetName.includes("廠商")) return [{k:["序號"],l:"序號"},{k:["會員編號"],l:"會員編號"},{k:["公司名稱"],l:"公司名稱"},{k:["公司統編"],l:"公司統編"},{k:["公司負責人"],l:"公司負責人"},{k:["聯絡窗口"],l:"聯絡窗口"},{k:["會員資格(Y/N)"],l:"會員資格(Y/N)"},...stats];
-                return [{k:["序號"],l:"序號"},{k:["姓名"],l:"姓名"},{k:["行動電話"],l:"行動電話"},{k:["會員資格(Y/N)"],l:"會員資格(Y/N)"},...stats];
-            }, [sheetName]);
-            const gv = (item, keys) => { const k = Object.keys(item).find(key => keys.some(s => key.includes(s))); return k ? item[k] : ""; };
-            return (
-                <div className="p-8 fade-in">
-                    <EditDrawer isOpen={!!editing} item={editing} sheetName={sheetName} onSaved={fetchData} onClose={()=>setEditing(null)} cols={cols} />
-                    <div className="flex justify-between items-center mb-8"><h2 className="text-3xl font-black text-gray-800 tracking-tighter">{title}</h2><div className="flex gap-2"><input placeholder="搜尋..." className="border-2 p-3 rounded-2xl w-80 shadow-sm focus:border-blue-400 outline-none" value={search} onChange={e=>setSearch(e.target.value)}/><button onClick={fetchData} className="bg-white border-2 p-3 rounded-2xl font-bold shadow-sm hover:bg-gray-50 transition">刷新</button></div></div>
-                    <div className="bg-white rounded-[2.5rem] shadow-xl overflow-x-auto border-4 border-white"><table className="w-full text-sm text-center"><thead><tr className="bg-gray-50 border-b">{cols.map((c,i)=><th key={i} className="whitespace-nowrap uppercase">{c.l}</th>)}<th>維護</th></tr></thead><tbody>{loading ? <tr><td colSpan={25} className="p-32 italic font-black text-gray-300 animate-pulse">Syncing...</td></tr> : filtered.map((item, idx) => (
-                        <tr key={idx} className="border-b hover:bg-gray-50 transition-all">
-                            {cols.map((c,ci)=><td key={ci} className={`${c.h ? "font-black text-blue-500 text-base" : ""} ${c.l === "備註" ? "text-left text-xs truncate max-w-[250px]" : "whitespace-nowrap"}`}>{gv(item, c.k)}</td>)}
-                            <td className="p-4"><button onClick={()=>setEditing(item)} className="bg-blue-50 text-blue-600 border-2 border-blue-100 px-4 py-1 rounded-xl font-bold text-xs active:scale-90 transition hover:bg-blue-600 hover:text-white">編輯</button></td>
-                        </tr>
-                    ))}</tbody></table></div>
-                </div>
-            );
-        };
-
-        const MemberLobby = () => {
-            const { user } = useContext(AuthContext);
-            const [view, setView] = useState('lobby'), [activities, setActivities] = useState([]), [history, setHistory] = useState([]), [loading, setLoading] = useState(true);
-            const fetchData = async () => {
-                setLoading(true);
-                if (view === 'lobby') { const res = await callAPI('getActivityList'); setActivities((res.data || []).filter(x => x.狀態 === '上架')); } 
-                else { const res = await callAPI('getUserRegistrations', { userId: user.userId }); setHistory(res.data || []); }
-                setLoading(false);
+        // 🌟 彈窗組件 (Modals)
+        function CreateActivityModal({ isOpen, onClose, onSaved }) {
+            const [form, setForm] = useState({ name: '', content: '', type: '講座類', courseTime: '', deadline: '', capacity: '20', needMeal: false });
+            const [loading, setLoading] = useState(false);
+            if (!isOpen) return null;
+            const handleSubmit = async () => {
+                if (!form.name) return alert("請輸入活動名稱");
+                setLoading(true); const res = await callAPI('createNewActivityWithForm', { form }); setLoading(false);
+                if (res.success) { alert("✨ 創建成功！"); onSaved(); onClose(); } else { alert("失敗: " + res.message); }
             };
-            useEffect(() => { fetchData(); }, [view]);
             return (
-                <div className="p-4 max-w-2xl mx-auto space-y-6 fade-in pb-20">
-                    <div className="bg-emerald-600 p-8 rounded-[3rem] shadow-xl text-white flex items-center gap-6">
-                        <img src={user.pictureUrl} className="w-20 h-20 rounded-full border-4 border-white/20 shadow-lg" />
-                        <div><p className="opacity-80 uppercase tracking-widest text-xs font-bold mb-1">您好，已成功綁定</p><h1 className="text-3xl font-black tracking-tighter uppercase">{user.displayName}</h1></div>
-                    </div>
-                    <div className="flex bg-white p-2 rounded-2xl shadow-md border-2 border-white">
-                        <button onClick={()=>setView('lobby')} className={`flex-1 py-3 rounded-xl font-bold transition ${view==='lobby'?'bg-emerald-500 text-white shadow-lg':'text-gray-400'}`}>📢 開放報名</button>
-                        <button onClick={()=>setView('history')} className={`flex-1 py-3 rounded-xl font-bold transition ${view==='history'?'bg-emerald-500 text-white shadow-lg':'text-gray-400'}`}>📂 我的紀錄</button>
-                    </div>
-                    <div className="bg-white p-6 rounded-[3rem] shadow-xl border-4 border-white min-h-[400px]">
-                        {loading ? <div className="p-20 text-center animate-pulse italic text-gray-300 font-bold uppercase">載入中...</div> : (
-                            <div className="space-y-4">
-                                {view === 'lobby' ? (activities.length === 0 ? <p className="text-center py-20 text-gray-300 font-bold italic">目前無開放活動</p> : activities.map((act, i) => (
-                                    <div key={i} className="flex justify-between items-center p-6 bg-gray-50 rounded-2xl border active:scale-95 transition-all"><div><div className="font-bold text-lg text-gray-800">{act['活動名稱']}</div><div className="text-xs text-gray-400 mt-1 font-bold uppercase">📅 {act['課程時間']}</div></div><a href={act['報名前端網址']} target="_blank" className="bg-emerald-600 text-white px-8 py-3 rounded-2xl font-bold shadow-lg">報名</a></div>
-                                ))) : (history.length === 0 ? <p className="text-center py-20 text-gray-300 font-bold italic uppercase">查無報名紀錄</p> : history.map((reg, i) => (
-                                    <div key={i} className="p-6 bg-gray-50 rounded-2xl border flex flex-col gap-2 relative overflow-hidden active:scale-95 transition-all"><div className="text-xs font-black text-emerald-600 uppercase tracking-widest mb-1 flex items-center gap-1"><span className="w-2 h-2 bg-emerald-500 rounded-full"></span> 報名成功</div><div className="font-bold text-lg text-gray-800">{reg.name}</div><div className="flex justify-between items-end"><div className="text-xs text-gray-400 font-bold tracking-tighter uppercase italic">開課: {reg.time}</div><div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase ${reg.status==='未簽到'?'bg-gray-200 text-gray-500':'bg-green-100 text-green-700 border border-green-200'}`}>{reg.status==='未簽到'?'已報名 (未簽到)':reg.status}</div></div></div>
-                                )))}
+                <div className="modal-overlay">
+                    <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl p-8 space-y-4 mx-4">
+                        <div className="flex justify-between border-b pb-4 items-center font-black text-2xl">✨ 創建活動<button onClick={onClose}>&times;</button></div>
+                        <div className="space-y-4">
+                            <div><label className="text-xs font-bold text-gray-400">活動名稱</label><input className="w-full border-2 p-3 rounded-xl font-bold" value={form.name} onChange={e=>setForm({...form, name:e.target.value})}/></div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className="text-xs font-bold text-gray-400">類型</label><select className="w-full border-2 p-3 rounded-xl font-bold" value={form.type} onChange={e=>setForm({...form, type:e.target.value})}><option>講座類</option><option>教學類</option><option>聯誼類</option><option>其他</option></select></div>
+                                <div><label className="text-xs font-bold text-gray-400">限額</label><input type="number" className="w-full border-2 p-3 rounded-xl font-bold" value={form.capacity} onChange={e=>setForm({...form, capacity:e.target.value})}/></div>
                             </div>
-                        )}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className="text-xs font-bold text-gray-400">開課日期</label><input className="w-full border-2 p-3 rounded-xl font-bold" placeholder="YYYY-MM-DD" value={form.courseTime} onChange={e=>setForm({...form, courseTime:e.target.value})}/></div>
+                                <div><label className="text-xs font-bold text-gray-400">截止日期</label><input className="w-full border-2 p-3 rounded-xl font-bold" placeholder="YYYY-MM-DD" value={form.deadline} onChange={e=>setForm({...form, deadline:e.target.value})}/></div>
+                            </div>
+                            <div className="pt-2"><label className="flex items-center gap-3 p-4 border-2 rounded-2xl bg-gray-50 cursor-pointer"><input type="checkbox" className="w-5 h-5 accent-green-600" checked={form.needMeal} onChange={e=>setForm({...form, needMeal:e.target.checked})}/><span className="font-bold text-gray-700">提供餐點？</span></label></div>
+                        </div>
+                        <div className="pt-4 flex gap-3"><button onClick={onClose} className="flex-1 py-4 border-2 rounded-2xl font-bold">取消</button><button onClick={handleSubmit} disabled={loading} className="flex-[2] bg-green-600 text-white py-4 rounded-2xl font-black shadow-lg">確認創建</button></div>
                     </div>
                 </div>
             );
-        };
+        }
 
-        const MainApp = () => {
-            const { role } = useContext(AuthContext);
-            const [view, setView] = useState('dashboard'), [activityData, setActivityData] = useState([]), [expandedMenu, setExpandedMenu] = useState(false), [selectedDetail, setSelectedDetail] = useState(null), [isCreateOpen, setCreateOpen] = useState(false);
-            const fetchActivities = () => { callAPI('getActivityList').then(res => setActivityData(res.data || [])); };
-            useEffect(() => { if(role==='admin') fetchActivities(); }, [role]);
-            const handleTakeDown = async (actName) => { if(confirm(`確定下架「${actName}」?`)){ await callAPI('updateActivityStatus',{name:actName,status:'下架'}); fetchActivities(); } };
-
-            if (role === "member") return <MemberLobby />;
-
+        function ReclassifyModal({ isOpen, activity, onClose, onRefresh }) {
+            const [type, setType] = useState("");
+            useEffect(() => { if(activity) setType(activity.活動類型); }, [activity]);
+            if (!isOpen || !activity) return null;
+            const handleSave = async () => { await callAPI('updateActivityType', { name: activity.活動名稱, type: type }); onRefresh(); onClose(); };
             return (
-                <div className="flex h-screen overflow-hidden">
-                    <CreateActivityModal isOpen={isCreateOpen} onClose={()=>setCreateOpen(false)} onSaved={fetchActivities} />
-                    <div className="sidebar-bg w-80 text-gray-300 flex flex-col shrink-0 shadow-2xl">
-                        <div className="p-12 border-b border-gray-700 text-[#4ade80] text-4xl font-black text-center italic tracking-tighter leading-none uppercase">TDEA<br/><span className="text-[10px] tracking-widest font-bold opacity-30 not-italic uppercase">ADMIN HUB</span></div>
-                        <nav className="flex-1 mt-10 space-y-2">
-                            <div className={`px-10 py-6 cursor-pointer flex items-center gap-5 transition-all ${view==='dashboard'?'active-item':'menu-item'}`} onClick={()=>{setView('dashboard');setSelectedDetail(null);}}><BarChart2/><span>數據總覽</span></div>
-                            <div className={`px-10 py-6 cursor-pointer flex items-center gap-5 transition-all ${view==='activity'?'active-item':'menu-item'}`} onClick={()=>{setView('activity');setSelectedDetail(null);}}><ActivityIcon/><span>活動維護中心</span></div>
-                            <div className={`px-10 py-6 cursor-pointer flex items-center justify-between menu-item transition-all ${['assoc','vendor','guest'].includes(view)?'text-green-400':''}`} onClick={() => setExpandedMenu(!expandedMenu)}>
-                                <div className="flex items-center gap-5"><Users/><span>會員名冊管理</span></div><div className={`transition-transform duration-300 ${expandedMenu?'rotate-180':''}`}><ChevronDown/></div>
-                            </div>
-                            {expandedMenu && (<div className="bg-[#24292f] border-l-8 border-[#243b32] transition-all duration-300 overflow-hidden"><div onClick={()=>{setView('assoc');setSelectedDetail(null);}} className={`px-16 py-4 cursor-pointer text-sm font-bold ${view==='assoc'?'text-green-400 bg-[#243b32]' : 'text-gray-500 hover:text-white'}`}>協會會員名冊</div><div onClick={()=>{setView('vendor');setSelectedDetail(null);}} className={`px-16 py-4 cursor-pointer text-sm font-bold ${view==='vendor'?'text-green-400 bg-[#243b32]' : 'text-gray-500 hover:text-white'}`}>廠商贊助名冊</div><div onClick={()=>{setView('guest');setSelectedDetail(null);}} className={`px-16 py-4 cursor-pointer text-sm font-bold ${view==='guest'?'text-green-400 bg-[#243b32]' : 'text-gray-500 hover:text-white'}`}>一般註冊名冊</div></div>)}
-                        </nav>
+                <div className="modal-overlay"><div className="bg-white p-12 rounded-[3rem] shadow-2xl w-full max-w-sm text-center border-8 border-gray-50">
+                    <h3 className="text-2xl font-black mb-2">🏷️ 修改分類</h3>
+                    <select className="w-full border-2 p-5 rounded-2xl mb-10 bg-gray-50 font-black text-xl text-center" value={type} onChange={e=>setType(e.target.value)}><option>講座類</option><option>教學類</option><option>聯誼類</option><option>其他</option></select>
+                    <div className="flex gap-4"><button onClick={onClose} className="flex-1 border-2 py-4 rounded-2xl font-bold">取消</button><button onClick={handleSave} className="flex-[2] bg-purple-600 text-white py-4 rounded-2xl font-bold shadow-xl">確認</button></div>
+                </div></div>
+            );
+        }
+
+        function LotteryDrawer({ isOpen, activity, onClose, onDataChange }) {
+            const [candidates, setCandidates] = useState([]);
+            const [winners, setWinners] = useState([]);
+            const [drawCount, setDrawCount] = useState(1);
+            const [prizeName, setPrizeName] = useState("");
+            const [drawing, setDrawing] = useState(false);
+            useEffect(() => {
+                if (isOpen && activity) {
+                    callAPI('getLotteryParticipants', { id: activity['活動試算表ID'] }).then(res => {
+                        setCandidates(res || []); setWinners((res || []).filter(p => p.batch).reverse());
+                    });
+                }
+            }, [isOpen, activity]);
+            const handleDraw = async () => {
+                if (!prizeName) return alert("請輸入獎項");
+                setDrawing(true);
+                const pool = candidates.filter(p => !p.batch && p.status !== "未簽到");
+                if (pool.length < drawCount) { setDrawing(false); return alert("合格人數不足"); }
+                const newWinners = []; const poolCopy = [...pool];
+                for(let i=0; i<drawCount; i++) { const idx = Math.floor(Math.random() * poolCopy.length); newWinners.push(poolCopy.splice(idx, 1)[0]); }
+                const nextBatch = `第 ${new Set(winners.map(w => w.batch)).size + 1} 梯`;
+                setWinners([...newWinners.map(w => ({ ...w, batch: nextBatch, prize: prizeName })), ...winners]);
+                setDrawing(false);
+                await callAPI('saveLotteryResults', { id: activity['活動試算表ID'], winners: newWinners.map(w=>({row: w._row, prize: prizeName})) });
+                onDataChange();
+            };
+            const handleClear = async () => { if(!confirm("確定清除？")) return; await callAPI('clearLotteryData', { id: activity['活動試算表ID'] }); setWinners([]); onDataChange(); };
+            if (!isOpen || !activity) return null;
+            return (
+                <div className="lottery-screen fade-in">
+                    <div className="w-full bg-[#fceda2] p-10 text-center shadow-md relative"><button onClick={onClose} className="absolute top-10 left-10 bg-white px-6 py-2 rounded-xl font-bold shadow">← 返回</button><h2 className="text-5xl font-black text-red-600 mb-2">幸運抽抽樂</h2></div>
+                    <div className="w-full p-8 border-b flex flex-wrap gap-8 items-end justify-center bg-white sticky top-0 z-10 shadow-sm">
+                        <div className="text-center"><label className="text-sm font-bold block mb-1 text-gray-400">獎項</label><input className="border-2 p-3 rounded-xl text-2xl w-80 text-center font-bold" value={prizeName} onChange={e => setPrizeName(e.target.value)} /></div>
+                        <div className="text-center"><label className="text-sm font-bold block mb-1 text-gray-400">人數</label><input type="number" className="border-2 p-3 rounded-xl text-2xl w-24 text-center font-bold" value={drawCount} onChange={e => setDrawCount(e.target.value)} /></div>
+                        <div className="flex gap-2"><button onClick={handleDraw} disabled={drawing} className="bg-green-600 text-white px-12 py-3 rounded-xl font-black text-2xl shadow">抽獎</button><button onClick={handleClear} className="bg-red-500 text-white px-6 py-3 rounded-xl font-bold text-xl shadow">清除</button></div>
                     </div>
-                    <main className="flex-1 overflow-auto bg-[#f8fafc] no-scrollbar">
-                        {selectedDetail ? <DetailPage activity={selectedDetail} onBack={()=>setSelectedDetail(null)} onRefresh={fetchActivities} /> : (
-                            <Fragment>
-                                {view==='dashboard' && <div className="p-8 fade-in">
-                                    <h2 className="text-2xl font-black mb-10 tracking-tighter flex items-center gap-3 italic uppercase text-gray-700 tracking-widest tracking-tighter">Global Monitor</h2>
-                                    <div className="grid grid-cols-3 gap-8 mb-16">
-                                        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm text-center border-2 border-green-50"><p className="text-xs text-gray-400 font-bold mb-1 uppercase tracking-widest tracking-tighter">上架活動</p><h3 className="text-3xl font-black text-green-600">{activityData.filter(x => x.狀態 === '上架').length}</h3></div>
-                                        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm text-center border-2 border-blue-50"><p className="text-xs text-gray-400 font-bold mb-1 uppercase tracking-widest tracking-tighter">協會會員</p><h3 className="text-3xl font-black text-blue-600">494</h3></div>
-                                        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm text-center border-2 border-purple-50"><p className="text-xs text-gray-400 font-bold mb-1 uppercase tracking-widest tracking-tighter">贊助廠商</p><h3 className="text-3xl font-black text-purple-600">32</h3></div>
-                                    </div>
-                                    <div className="bg-white rounded-[2.5rem] shadow-xl overflow-hidden border w-full mx-auto"><table className="w-full text-center text-sm"><thead className="bg-gray-50 border-b"><tr><th className="p-6 text-left pl-12 font-black text-gray-400 uppercase tracking-tighter">活動名稱</th><th className="uppercase tracking-tighter">狀態</th><th className="uppercase tracking-tighter text-blue-500">報名</th><th className="uppercase tracking-tighter">核銷</th></tr></thead><tbody>{activityData.filter(x => x.狀態 === '上架').map((act,idx)=>(<tr key={idx} className="border-b hover:bg-gray-50 transition-all"><td className="p-6 font-bold text-left pl-12 text-xl text-gray-800">{act['活動名稱']}</td><td><span className="bg-green-100 text-green-700 px-5 py-1.5 rounded-full text-[10px] font-black border border-green-200 uppercase tracking-tighter">ONLINE</span></td><td className="p-6 font-black text-blue-600 text-3xl">{act['報名人數']}</td><td className="p-6 text-gray-500 text-xl font-bold">{act['核銷人數'] || 0}</td></tr>))}</tbody></table></div>
-                                </div>}
-                                {view==='activity' && <div className="p-6 fade-in text-center">
-                                    <div className="flex justify-between mb-10 items-center text-left"><div className="flex gap-4"><button onClick={()=>setCreateOpen(true)} className="bg-green-600 text-white px-10 py-4 rounded-3xl font-black shadow-xl active:scale-95 transition flex items-center gap-2 hover:bg-green-700 shadow-green-100"><span>✨</span> 創建活動</button><h2 className="text-3xl font-black italic tracking-tighter text-gray-700 ml-4 self-center uppercase font-mono tracking-widest">Activity Console</h2></div><button onClick={fetchActivities} className="bg-blue-600 text-white px-10 py-3 rounded-2xl font-black shadow-xl active:scale-95 transition hover:bg-blue-700 shadow-blue-100 uppercase tracking-widest">同步</button></div>
-                                    <div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border-4 border-white"><table className="w-full text-sm"><thead><tr className="bg-gray-100 border-b"><th className="p-6 text-left pl-12 font-black uppercase tracking-tighter">活動監測</th><th className="w-24 text-blue-600">報名</th><th className="w-24">核銷</th><th className="w-24">狀態</th><th className="min-w-[580px] text-right pr-12">管理功能</th></tr></thead><tbody>{activityData.map((act, i) => (<tr key={i} className="border-b hover:bg-gray-50 transition-all"><td className="p-6 text-left pl-12"><div className="font-black text-xl mb-1 text-gray-800">{act['活動名稱']}</div><div className="text-[11px] text-gray-400 font-bold italic uppercase font-mono tracking-widest">{act['狀態']} MONITOR v15.4</div></td><td className="font-black text-blue-600 text-3xl">{act['報名人數']}</td><td className="text-gray-400 text-xl font-bold">{act['核銷人數'] || 0}</td><td><span className={`px-5 py-1.5 rounded-full text-[10px] font-black uppercase border ${act.狀態 === '上架' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-400'}`}>{act.狀態 === '上架' ? 'ONLINE' : 'OFFLINE'}</span></td><td className="p-4 whitespace-nowrap text-right pr-12"><div className="flex gap-2 justify-end"><a href={act['報名前端網址']} target="_blank" className="bg-emerald-500 text-white px-6 py-3 rounded-2xl font-bold text-xs shadow-lg active:scale-90 transition hover:bg-emerald-600">網址</a><button onClick={()=>setSelectedDetail(act)} className="bg-blue-500 text-white px-6 py-3 rounded-2xl font-bold text-xs shadow-lg active:scale-90 transition shadow-blue-50 hover:bg-blue-600">明細</button><button className="bg-purple-500 text-white px-6 py-3 rounded-2xl font-bold text-xs shadow-lg active:scale-90 transition shadow-purple-50 hover:bg-purple-600">分類</button><button className="bg-amber-500 text-white px-6 py-3 rounded-2xl font-bold text-xs shadow-lg active:scale-90 transition shadow-amber-50 hover:bg-amber-600">抽獎</button><button onClick={()=>handleTakeDown(act['活動名稱'])} className={`px-6 py-3 rounded-2xl text-white font-bold text-xs shadow-lg transition active:scale-90 ${act.狀態 === '上架' ? 'bg-rose-500 hover:bg-rose-600 shadow-rose-100' : 'bg-gray-700'}`}>{act.狀態 === '上架' ? '下架' : '已下架'}</button></div></td></tr>))}</tbody></table></div>
-                                </div>}
-                                {view==='assoc' && <MemberTable title="協會正式會員名冊" sheetName="本業會員" />}
-                                {view==='vendor' && <MemberTable title="廠商贊助名冊" sheetName="廠商會員" />}
-                                {view==='guest' && <MemberTable title="一般註冊名冊" sheetName="一般會員" />}
-                            </Fragment>
-                        )}
-                    </main>
+                    <div className="flex-1 overflow-auto p-12 bg-gray-50 flex justify-center w-full"><table className="w-[95%] max-w-7xl text-2xl text-center bg-white rounded-3xl shadow-2xl overflow-hidden h-fit mb-20 mx-auto"><thead className="bg-gray-200 text-gray-700"><tr><th className="p-6">梯次</th><th className="p-6">獎項</th><th className="p-6">姓名</th><th className="p-6">手機</th></tr></thead><tbody>{winners.map((w, i) => (<tr key={i} className="border-b hover:bg-yellow-50"><td className="p-6 font-black text-gray-400">{String(w.batch).replace(/\D/g,'')}</td><td className="p-6 font-bold text-blue-600">{w.prize}</td><td className="p-6 font-black text-gray-800">{w.name}</td><td className="p-6 text-gray-500 font-mono">{w.phone}</td></tr>))}</tbody></table></div>
                 </div>
             );
-        };
+        }
 
-        const App = () => (
-            <AuthProvider>
-                <MainApp />
-            </AuthProvider>
-        );
-
+        // 啟動 React
         const root = window.ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
