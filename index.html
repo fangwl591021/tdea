@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TDEA 管理中心</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
@@ -10,7 +10,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <style>
-        body { background-color: #f3f4f6; font-family: "Microsoft JhengHei", sans-serif; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
+        body { background-color: #f3f4f6; font-family: "Microsoft JhengHei", sans-serif; overflow-x: hidden; }
         .sidebar-bg { background-color: #2d333b; }
         .active-item { background-color: #243b32; border-left: 4px solid #4ade80; color: #4ade80; }
         .menu-item:hover:not(.active-item) { background-color: #3d444d; }
@@ -32,20 +32,15 @@
 <body>
     <div id="root"></div>
     <script type="text/babel">
+        // ---------------------------------------------------------
+        // 1. 全域變數 (Global Setup)
+        // ---------------------------------------------------------
         const { useState, useEffect, useContext, createContext, Fragment, useMemo } = window.React;
         const LIFF_ID = "2005868456-cfANNVou"; 
         const API_URL = "https://tdea.fangwl591021.workers.dev/"; 
-        
-        // 🌟 修正：統一使用 AuthContext
         const AuthContext = createContext(null);
 
-        // --- 圖示組件 ---
-        function IconBase({children}) { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{display:'inline-block', verticalAlign:'middle'}}>{children}</svg>; }
-        function BarChart2() { return <IconBase><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></IconBase>; }
-        function Users() { return <IconBase><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></IconBase>; }
-        function ActivityIcon() { return <IconBase><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></IconBase>; }
-        function ChevronDown() { return <IconBase><polyline points="6 9 12 15 18 9"/></IconBase>; }
-
+        // API 呼叫工具
         async function callAPI(action, data = {}) {
             try {
                 const response = await fetch(`${API_URL}?t=${new Date().getTime()}`, { 
@@ -56,6 +51,17 @@
             } catch (err) { return { success: false, message: "連線失敗" }; }
         }
 
+        // 圖示組件
+        function IconBase({children}) { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{display:'inline-block', verticalAlign:'middle'}}>{children}</svg>; }
+        function BarChart2() { return <IconBase><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></IconBase>; }
+        function Users() { return <IconBase><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></IconBase>; }
+        function ActivityIcon() { return <IconBase><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></IconBase>; }
+        function ChevronDown() { return <IconBase><polyline points="6 9 12 15 18 9"/></IconBase>; }
+        function IconPlus() { return <IconBase><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></IconBase>; }
+
+        // ---------------------------------------------------------
+        // 2. 核心組件 (Core Components)
+        // ---------------------------------------------------------
         function AuthProvider({ children }) {
             const [authState, setAuthState] = useState({ status: "LOADING", user: null, role: null });
             useEffect(() => {
@@ -74,12 +80,11 @@
                 };
                 init();
             }, []);
-            if (authState.status === "LOADING") return <div className="h-screen flex items-center justify-center font-black text-gray-400 italic tracking-widest uppercase">Syncing...</div>;
+            if (authState.status === "LOADING") return <div className="h-screen flex items-center justify-center italic text-gray-400 font-bold tracking-widest uppercase">SYNCING...</div>;
             return <AuthContext.Provider value={authState}>{children}</AuthContext.Provider>;
         }
 
-        // --- 組件定義 (改用 function 避免引用錯誤) ---
-
+        // --- 管理員功能 ---
         function CreateActivityModal({ isOpen, onClose, onSaved }) {
             const [form, setForm] = useState({ name: '', content: '', type: '講座類', courseTime: '', deadline: '', capacity: '20', needMeal: false });
             const [loading, setLoading] = useState(false);
@@ -127,7 +132,7 @@
                     <button onClick={onBack} className="bg-white border-2 px-6 py-2 rounded-2xl font-black text-gray-400 mb-6 shadow-sm active:scale-95 transition">← 返回列表</button>
                     <h2 className="text-2xl font-black mb-6 italic">📂 報名明細：{activity['活動名稱']}</h2>
                     <div className="bg-white rounded-3xl shadow-xl border-4 border-white overflow-hidden">
-                        {loading ? <div className="p-20 text-center animate-pulse italic text-gray-400 font-black">Syncing Details...</div> : (
+                        {loading ? <div className="p-20 text-center animate-pulse italic text-gray-400 font-black">Syncing...</div> : (
                             <table className="w-full text-center">
                                 <thead className="text-gray-400 border-b"><tr><th>姓名</th><th>手機</th><th>狀態</th><th>簽到</th></tr></thead>
                                 <tbody>{data.length === 0 ? <tr><td colSpan="4" className="p-10 text-gray-300 italic">目前無報名資料</td></tr> : filtered.map((r, i) => (<tr key={i} className="border-b hover:bg-gray-50 transition-all"><td className="p-6 font-black text-gray-700">{r.姓名}</td><td className="p-6 font-mono text-gray-500">{r.電話}</td><td className="p-6">{r.核銷狀態 === "未簽到" ? <span className="text-red-400 font-bold bg-red-50 px-4 py-1.5 rounded-full text-xs">未簽到</span> : <span className="text-green-600 font-bold bg-green-50 px-4 py-1.5 rounded-full text-xs border border-green-100 font-mono tracking-tighter">{r.核銷狀態}</span>}</td><td className="p-6"><button onClick={() => handleToggle(r._row, r.核銷狀態)} className={`px-10 py-3 rounded-2xl text-white font-black shadow-lg transition active:scale-90 ${r.核銷狀態 === "未簽到" ? 'bg-blue-600 shadow-blue-100' : 'bg-gray-400 shadow-gray-100'}`}>{r.核銷狀態 === "未簽到" ? "簽到" : "取消"}</button></td></tr>))}</tbody>
@@ -149,7 +154,7 @@
                     <div className="drawer-overlay" onClick={onClose}></div>
                     <div className="drawer-container p-8">
                         <div className="flex justify-between items-center mb-6 border-b pb-4"><h3 className="text-2xl font-black tracking-tight text-gray-800">✏️ 編輯資料</h3><button onClick={onClose} className="text-gray-400 text-3xl font-bold hover:text-red-500 transition-colors">&times;</button></div>
-                        <div className="flex gap-4 mb-8 pb-6 border-b"><button onClick={onClose} className="flex-1 border-2 py-4 rounded-2xl font-bold text-gray-400 hover:bg-gray-50 transition">取消</button><button onClick={handleSave} disabled={isSaving} className="flex-[2] bg-blue-600 text-white py-4 rounded-2xl font-black shadow-xl active:scale-95 transition">{isSaving ? "存檔中..." : "確認存檔"}</button></div>
+                        <div className="flex gap-3 mb-8 pb-6 border-b"><button onClick={onClose} className="flex-1 py-4 border-2 rounded-2xl font-bold text-gray-400 hover:bg-gray-50 transition">取消返回</button><button onClick={handleSave} disabled={isSaving} className="flex-[2] bg-blue-600 text-white py-4 rounded-2xl font-black shadow-xl active:scale-95 transition">{isSaving ? "存檔中..." : "確認存檔"}</button></div>
                         <div className="space-y-4 overflow-auto flex-1 no-scrollbar pr-2">
                             {fields.map(f => (<div key={f}><label className="text-xs font-bold text-gray-400 block mb-1 uppercase">{f}</label>{f.includes("備註")?<textarea className="w-full border-2 p-3 rounded-xl h-24 font-bold" value={formData[f]||""} onChange={e=>setFormData({...formData,[f]:e.target.value})}/>: f.includes("資格") ? <select className="w-full border-2 p-3 rounded-xl font-bold" value={formData[f]||""} onChange={e=>setFormData({...formData, [f]:e.target.value})}><option value="">請選擇</option><option value="Y">Y</option><option value="N">N</option></select> : <input className="w-full border-2 p-3 rounded-xl font-bold" value={formData[f]||""} onChange={e=>setFormData({...formData,[f]:e.target.value})}/>}</div>))}
                         </div>
@@ -205,14 +210,12 @@
                 setDrawing(true);
                 const pool = candidates.filter(p => !p.batch && (!onlyCheckedIn || p.status !== "未簽到"));
                 if (pool.length < drawCount) { setDrawing(false); return alert("合格人數不足"); }
-                
                 const newWinners = [];
                 const poolCopy = [...pool];
                 for(let i=0; i<drawCount; i++) {
                     const idx = Math.floor(Math.random() * poolCopy.length);
                     newWinners.push(poolCopy.splice(idx, 1)[0]);
                 }
-
                 const nextBatch = `第 ${new Set(winners.map(w => w.batch)).size + 1} 梯`;
                 const displayOnes = newWinners.map(w => ({ ...w, batch: nextBatch, prize: prizeName }));
                 setWinners([...displayOnes, ...winners]);
@@ -287,6 +290,8 @@
             );
         }
 
+        // --- 會員與管理員介面 ---
+
         function MemberLobby() {
             const { user } = useContext(AuthContext);
             const [view, setView] = useState('lobby'), [activities, setActivities] = useState([]), [history, setHistory] = useState([]), [loading, setLoading] = useState(true);
@@ -341,13 +346,36 @@
             );
         }
 
-        // --- 主程式 ---
+        function DashboardView({ activityData }) {
+            return (
+                <div className="p-8 fade-in">
+                    <h2 className="text-2xl font-black mb-10 tracking-tighter flex items-center gap-3 italic uppercase text-gray-700 tracking-widest">Global Monitor</h2>
+                    <div className="grid grid-cols-3 gap-8 mb-16">
+                        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm text-center border-2 border-green-50"><p className="text-xs text-gray-400 font-bold mb-1 uppercase tracking-widest tracking-tighter">上架活動</p><h3 className="text-3xl font-black text-green-600">{activityData.filter(x => x.狀態 === '上架').length}</h3></div>
+                        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm text-center border-2 border-blue-50"><p className="text-xs text-gray-400 font-bold mb-1 uppercase tracking-widest tracking-tighter">協會正式會員</p><h3 className="text-3xl font-black text-blue-600">494</h3></div>
+                        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm text-center border-2 border-purple-50"><p className="text-xs text-gray-400 font-bold mb-1 uppercase tracking-widest tracking-tighter">贊助廠商</p><h3 className="text-3xl font-black text-purple-600">32</h3></div>
+                    </div>
+                    <div className="bg-white rounded-[2.5rem] shadow-xl overflow-hidden border w-full mx-auto"><table className="w-full text-center text-sm"><thead className="bg-gray-50 border-b"><tr><th className="p-6 text-left pl-12 font-black text-gray-400 uppercase tracking-tighter">活動名稱</th><th className="uppercase tracking-tighter">狀態</th><th className="uppercase tracking-tighter">報名</th><th className="uppercase tracking-tighter">核銷</th></tr></thead><tbody>{activityData.filter(x => x.狀態 === '上架').map((act,idx)=>(<tr key={idx} className="border-b hover:bg-gray-50 transition-all"><td className="p-6 font-bold text-left pl-12 text-xl text-gray-700">{act['活動名稱']}</td><td><span className="bg-green-100 text-green-700 px-5 py-1.5 rounded-full text-[10px] font-black border border-green-200 uppercase tracking-tighter">ONLINE</span></td><td className="p-6 font-black text-blue-600 text-3xl">{act['報名人數']}</td><td className="p-6 text-gray-500 text-xl font-bold">{act['核銷人數'] || 0}</td></tr>))}</tbody></table></div>
+                </div>
+            );
+        }
+
+        function ActivityConsole({ activityData, fetchActivities, setSelectedDetail, setCreateOpen, setReTarget, setLotTarget, handleTakeDown }) {
+            return (
+                <div className="p-6 fade-in">
+                    <div className="flex justify-between mb-10 items-center text-left"><div className="flex gap-4"><button onClick={()=>setCreateOpen(true)} className="bg-green-600 text-white px-10 py-4 rounded-3xl font-black shadow-xl active:scale-95 transition flex items-center gap-2 hover:bg-green-700"><span>✨</span> 創建新活動</button><h2 className="text-3xl font-black italic tracking-tighter text-gray-700 ml-4 self-center uppercase font-mono tracking-widest">Activity Console</h2></div><button onClick={fetchActivities} className="bg-blue-600 text-white px-10 py-3 rounded-2xl font-black shadow-xl active:scale-95 transition hover:bg-blue-700 shadow-blue-100 uppercase tracking-widest">同步</button></div>
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border-4 border-white text-center"><table className="w-full text-sm"><thead className="bg-gray-100 border-b"><tr><th className="p-6 text-left pl-12 font-black uppercase tracking-tighter">活動名稱 / 系統監控</th><th className="w-24 uppercase tracking-tighter">報名</th><th className="w-24 uppercase tracking-tighter">核銷</th><th className="w-24 uppercase tracking-tighter">狀態</th><th className="min-w-[580px] uppercase tracking-tighter text-right pr-12">功能操作區</th></tr></thead><tbody>{activityData.map((act, i) => (<tr key={i} className="border-b hover:bg-gray-50 transition-all"><td className="p-6 text-left pl-12"><div className="font-black text-xl mb-1 text-gray-800">{act['活動名稱']}</div><div className="text-[11px] text-gray-400 font-bold italic uppercase font-mono tracking-widest">{act['狀態']} MONITOR v16.4</div></td><td className="font-black text-blue-600 text-3xl">{act['報名人數']}</td><td className="text-gray-400 text-xl font-bold">{act['核銷人數'] || 0}</td><td><span className={`px-5 py-1.5 rounded-full text-[10px] font-black uppercase border ${act.狀態 === '上架' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>{act.狀態 === '上架' ? 'ONLINE' : 'OFFLINE'}</span></td><td className="p-4 whitespace-nowrap text-right pr-12"><div className="flex gap-2 justify-end"><a href={act['報名前端網址']} target="_blank" className="bg-emerald-500 text-white px-6 py-3 rounded-2xl font-bold text-xs shadow-lg active:scale-90 transition hover:bg-emerald-600">網址</a><button onClick={()=>setSelectedDetail(act)} className="bg-blue-500 text-white px-6 py-3 rounded-2xl font-bold text-xs shadow-lg active:scale-90 transition shadow-blue-50 hover:bg-blue-600">明細</button><button className="bg-purple-500 text-white px-6 py-3 rounded-2xl font-bold text-xs shadow-lg active:scale-90 transition shadow-purple-50 hover:bg-purple-600" onClick={()=>setReTarget(act)}>分類</button><button className="bg-amber-500 text-white px-6 py-3 rounded-2xl font-bold text-xs shadow-lg active:scale-90 transition shadow-amber-50 hover:bg-amber-600" onClick={()=>setLotTarget(act)}>抽獎</button><button onClick={()=>handleTakeDown(act['活動名稱'])} className={`px-6 py-3 rounded-2xl text-white font-bold text-xs shadow-lg transition active:scale-90 ${act.狀態 === '上架' ? 'bg-rose-500 hover:bg-rose-600 shadow-rose-100' : 'bg-gray-700'}`}>{act.狀態 === '上架' ? '下架' : '已下架'}</button></div></td></tr>))}</tbody></table></div>
+                </div>
+            );
+        }
+
+        // --- 主應用入口 ---
         function MainApp() {
             const { role } = useContext(AuthContext);
             const [view, setView] = useState('dashboard'), [activityData, setActivityData] = useState([]), [expandedMenu, setExpandedMenu] = useState(false), [selectedDetail, setSelectedDetail] = useState(null), [isCreateOpen, setCreateOpen] = useState(false);
             const [lotTarget, setLotTarget] = useState(null);
             const [reTarget, setReTarget] = useState(null);
-            
+
             const fetchActivities = () => { callAPI('getActivityList').then(res => setActivityData(res.data || [])); };
             useEffect(() => { if(role==='admin') fetchActivities(); }, [role]);
             const handleTakeDown = async (actName) => { if(confirm(`確定下架「${actName}」?`)){ await callAPI('updateActivityStatus',{name:actName,status:'下架'}); fetchActivities(); } };
@@ -361,7 +389,7 @@
                     <ReclassifyModal isOpen={!!reTarget} activity={reTarget} onClose={()=>setReTarget(null)} onRefresh={fetchActivities} />
                     
                     <div className="w-80 sidebar-bg text-gray-300 flex flex-col shrink-0 shadow-2xl">
-                        <div className="p-12 border-b border-gray-700 text-[#4ade80] text-4xl font-black text-center italic tracking-tighter leading-none uppercase">TDEA<br/><span className="text-[10px] tracking-widest font-bold opacity-30 not-italic uppercase">HUB v16.3</span></div>
+                        <div className="p-12 border-b border-gray-700 text-[#4ade80] text-4xl font-black text-center italic tracking-tighter leading-none uppercase">TDEA<br/><span className="text-[10px] tracking-widest font-bold opacity-30 not-italic uppercase">HUB v16.4</span></div>
                         <nav className="flex-1 mt-10 space-y-2">
                             <div className={`px-10 py-6 cursor-pointer flex items-center gap-5 transition-all ${view==='dashboard'?'active-item':'menu-item'}`} onClick={()=>{setView('dashboard');setSelectedDetail(null);}}><BarChart2/><span>系統總覽</span></div>
                             <div className={`px-10 py-6 cursor-pointer flex items-center gap-5 transition-all ${view==='activity'?'active-item':'menu-item'}`} onClick={()=>{setView('activity');setSelectedDetail(null);}}><ActivityIcon/><span>活動控制中心</span></div>
@@ -374,19 +402,8 @@
                     <main className="flex-1 overflow-auto bg-[#f8fafc] no-scrollbar">
                         {selectedDetail ? <DetailPage activity={selectedDetail} onBack={()=>setSelectedDetail(null)} onRefresh={fetchActivities} /> : (
                             <Fragment>
-                                {view==='dashboard' && <div className="p-8 fade-in">
-                                    <h2 className="text-2xl font-black mb-10 tracking-tighter flex items-center gap-3 italic uppercase text-gray-700 tracking-widest">Global Monitor</h2>
-                                    <div className="grid grid-cols-3 gap-8 mb-16">
-                                        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm text-center border-2 border-green-50"><p className="text-xs text-gray-400 font-bold mb-1 uppercase tracking-widest tracking-tighter">上架活動</p><h3 className="text-3xl font-black text-green-600">{activityData.filter(x => x.狀態 === '上架').length}</h3></div>
-                                        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm text-center border-2 border-blue-50"><p className="text-xs text-gray-400 font-bold mb-1 uppercase tracking-widest tracking-tighter">協會正式會員</p><h3 className="text-3xl font-black text-blue-600">494</h3></div>
-                                        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm text-center border-2 border-purple-50"><p className="text-xs text-gray-400 font-bold mb-1 uppercase tracking-widest tracking-tighter">贊助廠商</p><h3 className="text-3xl font-black text-purple-600">32</h3></div>
-                                    </div>
-                                    <div className="bg-white rounded-[2.5rem] shadow-xl overflow-hidden border w-full mx-auto"><table className="w-full text-center text-sm"><thead className="bg-gray-50 border-b"><tr><th className="p-6 text-left pl-12 font-black text-gray-400 uppercase tracking-tighter">活動名稱</th><th className="uppercase tracking-tighter">狀態</th><th className="uppercase tracking-tighter">報名</th><th className="uppercase tracking-tighter">核銷</th></tr></thead><tbody>{activityData.filter(x => x.狀態 === '上架').map((act,idx)=>(<tr key={idx} className="border-b hover:bg-gray-50 transition-all"><td className="p-6 font-bold text-left pl-12 text-xl text-gray-800">{act['活動名稱']}</td><td><span className="bg-green-100 text-green-700 px-5 py-1.5 rounded-full text-[10px] font-black border border-green-200 uppercase tracking-tighter">ONLINE</span></td><td className="p-6 font-black text-blue-600 text-3xl">{act['報名人數']}</td><td className="p-6 text-gray-500 text-xl font-bold">{act['核銷人數'] || 0}</td></tr>))}</tbody></table></div>
-                                </div>}
-                                {view==='activity' && <div className="p-6 fade-in">
-                                    <div className="flex justify-between mb-10 items-center text-left"><div className="flex gap-4"><button onClick={()=>setCreateOpen(true)} className="bg-green-600 text-white px-10 py-4 rounded-3xl font-black shadow-xl active:scale-95 transition flex items-center gap-2 hover:bg-green-700"><span>✨</span> 創建新活動</button><h2 className="text-3xl font-black italic tracking-tighter text-gray-700 ml-4 self-center uppercase font-mono tracking-widest">Activity Console</h2></div><button onClick={fetchActivities} className="bg-blue-600 text-white px-10 py-3 rounded-2xl font-black shadow-xl active:scale-95 transition hover:bg-blue-700 shadow-blue-100 uppercase tracking-widest">同步</button></div>
-                                    <div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border-4 border-white text-center"><table className="w-full text-sm"><thead className="bg-gray-100 border-b"><tr><th className="p-6 text-left pl-12 font-black uppercase tracking-tighter">活動名稱 / 系統監控</th><th className="w-24 uppercase tracking-tighter">報名</th><th className="w-24 uppercase tracking-tighter">核銷</th><th className="w-24 uppercase tracking-tighter">狀態</th><th className="min-w-[580px] uppercase tracking-tighter text-right pr-12">功能操作區</th></tr></thead><tbody>{activityData.map((act, i) => (<tr key={i} className="border-b hover:bg-gray-50 transition-all"><td className="p-6 text-left pl-12"><div className="font-black text-xl mb-1 text-gray-800">{act['活動名稱']}</div><div className="text-[11px] text-gray-400 font-bold italic uppercase font-mono tracking-widest">{act['狀態']} MONITOR v16.3</div></td><td className="font-black text-blue-600 text-3xl">{act['報名人數']}</td><td className="text-gray-400 text-xl font-bold">{act['核銷人數'] || 0}</td><td><span className={`px-5 py-1.5 rounded-full text-[10px] font-black uppercase border ${act.狀態 === '上架' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>{act.狀態 === '上架' ? 'ONLINE' : 'OFFLINE'}</span></td><td className="p-4 whitespace-nowrap text-right pr-12"><div className="flex gap-2 justify-end"><a href={act['報名前端網址']} target="_blank" className="bg-emerald-500 text-white px-6 py-3 rounded-2xl font-bold text-xs shadow-lg active:scale-90 transition hover:bg-emerald-600">網址</a><button onClick={()=>setSelectedDetail(act)} className="bg-blue-500 text-white px-6 py-3 rounded-2xl font-bold text-xs shadow-lg active:scale-90 transition shadow-blue-100 hover:bg-blue-600">明細</button><button className="bg-purple-500 text-white px-6 py-3 rounded-2xl font-bold text-xs shadow-lg active:scale-90 transition shadow-purple-50 hover:bg-purple-600" onClick={()=>setReTarget(act)}>分類</button><button className="bg-amber-500 text-white px-6 py-3 rounded-2xl font-bold text-xs shadow-lg active:scale-90 transition shadow-amber-50 hover:bg-amber-600" onClick={()=>setLotTarget(act)}>抽獎</button><button onClick={()=>handleTakeDown(act['活動名稱'])} className={`px-6 py-3 rounded-2xl text-white font-bold text-xs shadow-lg transition active:scale-90 ${act.狀態 === '上架' ? 'bg-rose-500 hover:bg-rose-600 shadow-rose-100' : 'bg-gray-700'}`}>{act.狀態 === '上架' ? '下架' : '已下架'}</button></div></td></tr>))}</tbody></table></div>
-                                </div>}
+                                {view==='dashboard' && <DashboardView activityData={activityData} />}
+                                {view==='activity' && <ActivityConsole activityData={activityData} fetchActivities={fetchActivities} setSelectedDetail={setSelectedDetail} setCreateOpen={setCreateOpen} setReTarget={setReTarget} setLotTarget={setLotTarget} handleTakeDown={handleTakeDown} />}
                                 {view==='assoc' && <MemberTable title="協會正式會員名冊管理" sheetName="本業會員" />}
                                 {view==='vendor' && <MemberTable title="廠商贊助單位名冊管理" sheetName="廠商會員" />}
                                 {view==='guest' && <MemberTable title="一般註冊名冊資料管理" sheetName="一般會員" />}
