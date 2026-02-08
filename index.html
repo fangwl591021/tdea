@@ -18,6 +18,7 @@
         table td { text-align: center !important; font-size: 14px; padding: 12px 8px; border-bottom: 1px solid #f3f4f6; }
         .fade-in { animation: fadeIn 0.4s forwards; }
         @keyframes fadeIn { from{opacity:0; transform: translateY(10px);} to{opacity:1; transform: translateY(0);} }
+        
         .drawer-root { position: fixed; inset: 0; z-index: 9999; pointer-events: none; visibility: hidden; }
         .drawer-root.is-open { pointer-events: auto; visibility: visible; }
         .drawer-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); opacity: 0; transition: opacity 0.3s; backdrop-filter: blur(2px); }
@@ -106,7 +107,7 @@
                         <div className="space-y-4">
                             <div><label className="text-xs font-bold text-gray-400">活動名稱</label><input className="w-full border-2 p-3 rounded-xl font-bold" value={form.name} onChange={e=>setForm({...form, name:e.target.value})}/></div>
                             <div className="grid grid-cols-2 gap-4">
-                                <div><label className="text-xs font-bold text-gray-400">類型</label><select className="w-full border-2 p-3 rounded-xl font-bold bg-white" value={form.type} onChange={e=>setForm({...form, type:e.target.value})}><option>講座類</option><option>教學類</option><option>聯誼類</option><option>其他</option></select></div>
+                                <div><label className="text-xs font-bold text-gray-400">類型</label><select className="w-full border-2 p-3 rounded-xl font-bold" value={form.type} onChange={e=>setForm({...form, type:e.target.value})}><option>講座類</option><option>教學類</option><option>聯誼類</option><option>其他</option></select></div>
                                 <div><label className="text-xs font-bold text-gray-400">限額</label><input type="number" className="w-full border-2 p-3 rounded-xl font-bold" value={form.capacity} onChange={e=>setForm({...form, capacity:e.target.value})}/></div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
@@ -135,7 +136,7 @@
                     <h2 className="text-2xl font-black mb-6 italic">📂 報名明細：{activity['活動名稱']}</h2>
                     <div className="bg-white rounded-3xl shadow-xl border-4 border-white overflow-hidden">
                         <div className="p-6 border-b flex justify-between"><input placeholder="搜尋..." className="border-2 p-3 rounded-xl w-full max-w-sm" value={search} onChange={e=>setSearch(e.target.value)} /><button onClick={fetchList} className="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold ml-4">刷新</button></div>
-                        {loading ? <div className="p-20 text-center animate-pulse italic text-gray-400 font-black">Syncing Details...</div> : (
+                        {loading ? <div className="p-20 text-center animate-pulse italic text-gray-400 font-black">Syncing...</div> : (
                             <table className="w-full text-center">
                                 <thead className="text-gray-400 border-b"><tr><th>姓名</th><th>手機</th><th>狀態</th><th>簽到</th></tr></thead>
                                 <tbody>{data.length === 0 ? <tr><td colSpan="4" className="p-10 text-gray-300 italic">無資料</td></tr> : filtered.map((r, i) => (<tr key={i} className="border-b hover:bg-gray-50 transition-all"><td className="p-6 font-black">{r.姓名}</td><td className="p-6 font-mono">{r.電話}</td><td className="p-6">{r.核銷狀態 === "未簽到" ? <span className="text-red-400 font-bold bg-red-50 px-4 py-1.5 rounded-full text-xs">未簽到</span> : <span className="text-green-600 font-bold bg-green-50 px-4 py-1.5 rounded-full text-xs border border-green-100 font-mono tracking-tighter">{r.核銷狀態}</span>}</td><td className="p-6"><button onClick={() => handleToggle(r._row, r.核銷狀態)} className={`px-10 py-3 rounded-2xl text-white font-black shadow-lg transition active:scale-90 ${r.核銷狀態 === "未簽到" ? 'bg-blue-600 shadow-blue-100' : 'bg-gray-400 shadow-gray-100'}`}>{r.核銷狀態 === "未簽到" ? "簽到" : "取消"}</button></td></tr>))}</tbody>
@@ -151,7 +152,7 @@
             const [isSaving, setIsSaving] = useState(false);
             const isNew = !item;
             useEffect(() => { setFormData(item || {}); }, [item]);
-            const fields = cols.map(c => c.l).filter(l => l !== "維護" && l !== "序號");
+            const fields = cols.map(c => c.l).filter(l => l !== "維護" && l !== "序號" && l !== "是否綁定");
             const handleSave = async () => { 
                 setIsSaving(true); 
                 const action = isNew ? 'addMember' : 'updateMemberData';
@@ -160,11 +161,11 @@
                 if(res.success) { onSaved(); onClose(); } else { alert("失敗：" + res.message); }
             };
             return (
-                <div className={`drawer-root ${isOpen ? 'is-open' : ''}`}>
+                <div className={`drawer-root ${isOpen ? 'is-open' : ''}`} style={{visibility: isOpen?'visible':'hidden'}}>
                     <div className="drawer-overlay" onClick={onClose}></div>
                     <div className="drawer-container p-8">
                         <div className="flex justify-between items-center mb-6 border-b pb-4"><h3 className="text-2xl font-black tracking-tight text-gray-800">{isNew ? "✨ 新增" : "✏️ 編輯"}</h3><button onClick={onClose} className="text-gray-400 text-3xl font-bold hover:text-red-500 transition-colors">&times;</button></div>
-                        <div className="flex gap-4 mb-8 pb-6 border-b"><button onClick={onClose} className="flex-1 py-4 border-2 rounded-2xl font-bold text-gray-400 hover:bg-gray-50 transition">取消</button><button onClick={handleSave} disabled={isSaving} className="flex-[2] bg-blue-600 text-white py-4 rounded-2xl font-black shadow-xl active:scale-95 transition">{isSaving ? "存檔中..." : "確認"}</button></div>
+                        <div className="flex gap-4 mb-8 pb-6 border-b"><button onClick={onClose} className="flex-1 border-2 py-4 rounded-2xl font-bold text-gray-400 hover:bg-gray-50 transition">取消</button><button onClick={handleSave} disabled={isSaving} className="flex-[2] bg-blue-600 text-white py-4 rounded-2xl font-black shadow-xl active:scale-95 transition">{isSaving ? "存檔中..." : "確認"}</button></div>
                         <div className="space-y-4 overflow-auto flex-1 no-scrollbar pr-2">
                             {fields.map(f => (<div key={f}><label className="text-xs font-bold text-gray-400 block mb-1 uppercase">{f}</label>{f.includes("備註")?<textarea className="w-full border-2 p-3 rounded-xl h-24 font-bold" value={formData[f]||""} onChange={e=>setFormData({...formData,[f]:e.target.value})}/>: f.includes("資格") ? <select className="w-full border-2 p-3 rounded-xl font-bold" value={formData[f]||""} onChange={e=>setFormData({...formData, [f]:e.target.value})}><option value="">請選擇</option><option value="Y">Y</option><option value="N">N</option></select> : <input className="w-full border-2 p-3 rounded-xl font-bold" value={formData[f]||""} onChange={e=>setFormData({...formData,[f]:e.target.value})}/>}</div>))}
                         </div>
@@ -256,19 +257,23 @@
             useEffect(() => fetchData(), [sheetName]);
             const filtered = data.filter(d => Object.values(d).some(v => String(v).includes(search)));
             const cols = useMemo(() => {
-                const stats = [{k:["活動報名次數","報名"],l:"活動報名次數",h:true},{k:["講座類次數","講座"],l:"講座類次數"},{k:["教學類次數","教學"],l:"教學類次數"},{k:["聯誼類次數","聯誼"],l:"聯誼類次數"},{k:["備註"],l:"備註",mw:"250px"}];
+                const stats = [{k:["活動報名次數","報名"],l:"活動報名次數",h:true},{k:["講座類次數","講座"],l:"講座類次數"},{k:["教學類次數","教學"],l:"教學類次數"},{k:["聯誼類次數","聯誼"],l:"聯誼類次數"},{k:["備註"],l:"備註",mw:"250px"}, {k:["是否綁定"],l:"綁定狀態"}];
                 if (sheetName.includes("本業")) return [{k:["序號"],l:"序號"},{k:["會員編號"],l:"會員編號"},{k:["身分"],l:"身分"},{k:["姓名"],l:"姓名"},{k:["性別"],l:"性別"},{k:["會員資格(Y/N)","資格"],l:"會員資格(Y/N)"},...stats];
                 if (sheetName.includes("廠商")) return [{k:["序號"],l:"序號"},{k:["會員編號"],l:"會員編號"},{k:["公司名稱"],l:"公司名稱"},{k:["公司統編"],l:"公司統編"},{k:["公司負責人"],l:"公司負責人"},{k:["聯絡窗口"],l:"聯絡窗口"},{k:["會員資格(Y/N)","資格"],l:"會員資格(Y/N)"},...stats];
                 return [{k:["序號"],l:"序號"},{k:["姓名"],l:"姓名"},{k:["行動電話"],l:"行動電話"},{k:["會員資格(Y/N)","資格"],l:"會員資格(Y/N)"},...stats];
             }, [sheetName]);
             const gv = (item, keys) => { const k = Object.keys(item).find(key => keys.some(s => key.includes(s))); return k ? item[k] : ""; };
             const handleDelete = async (row) => { if(!confirm("確定刪除？")) return; const res = await callAPI('deleteMember', { sheetName, row }); if(res.success) fetchData(); else alert("失敗"); };
+            
             return (
                 <div className="p-8 fade-in">
                     <EditDrawer isOpen={!!editing || isAdding} item={editing} sheetName={sheetName} onClose={()=>{setEditing(null);setIsAdding(false);}} onSaved={fetchData} cols={cols} />
                     <div className="flex justify-between items-center mb-8"><h2 className="text-3xl font-black text-gray-800 tracking-tighter uppercase italic">{title}</h2><div className="flex gap-3"><input placeholder="搜尋..." className="border-2 p-3 rounded-2xl w-80 shadow-sm focus:border-blue-400 outline-none" value={search} onChange={e=>setSearch(e.target.value)}/><button onClick={()=>setIsAdding(true)} className="bg-green-500 text-white px-4 py-2 rounded-2xl font-bold shadow flex items-center gap-2"><IconPlus/>新增</button><button onClick={fetchData} className="bg-white border-2 p-3 rounded-2xl font-bold shadow-sm">刷新</button></div></div>
-                    <div className="bg-white rounded-[2.5rem] shadow-xl overflow-x-auto border-4 border-white"><table className="w-full text-sm text-center"><thead><tr className="bg-gray-50 border-b">{cols.map((c,i)=><th key={i} style={c.mw?{minWidth:c.mw}:{}} className="whitespace-nowrap">{c.l}</th>)}<th>維護</th></tr></thead><tbody>{loading ? <tr><td colSpan={20} className="p-32 italic font-black text-gray-300 uppercase animate-pulse">Syncing...</td></tr> : filtered.map((item, idx) => (
-                        <tr key={idx} className="border-b hover:bg-gray-50 transition-all">{cols.map((c,ci)=><td key={ci} className={`${c.h ? "font-black text-blue-500 text-base" : ""} ${c.l === "備註" ? "text-left text-xs truncate max-w-[250px]" : "whitespace-nowrap"}`}>{gv(item, c.k)}</td>)}<td className="p-4 flex gap-2 justify-center"><button onClick={()=>setEditing(item)} className="bg-blue-50 text-blue-600 border-2 border-blue-100 px-4 py-1.5 rounded-xl font-bold text-xs">編輯</button><button onClick={()=>handleDelete(item._row)} className="bg-red-50 text-red-600 border-2 border-red-100 px-3 py-1.5 rounded-xl font-bold text-xs"><Trash2/></button></td></tr>
+                    <div className="bg-white rounded-[2.5rem] shadow-xl overflow-x-auto border-4 border-white"><table className="w-full text-sm text-center"><thead><tr className="bg-gray-50 border-b">{cols.map((c,i)=><th key={i} style={c.mw?{minWidth:c.mw}:{}} className="whitespace-nowrap">{c.l}</th>)}<th>維護</th></tr></thead><tbody>{loading ? <tr><td colSpan={25} className="p-32 italic font-black text-gray-300">Syncing...</td></tr> : filtered.map((item, idx) => (
+                        <tr key={idx} className="border-b hover:bg-gray-50 transition-all">
+                            {cols.map((c,ci)=><td key={ci} className={`${c.h ? "font-black text-blue-500" : ""} ${c.l === "綁定狀態" && gv(item, c.k)==="完成綁定" ? "text-green-600 font-bold" : (c.l==="綁定狀態"?"text-red-400":"")}`}>{gv(item, c.k)}</td>)}
+                            <td className="p-4 flex gap-2 justify-center"><button onClick={()=>setEditing(item)} className="bg-blue-50 text-blue-600 border-2 border-blue-100 px-4 py-1.5 rounded-xl font-bold text-xs">編輯</button><button onClick={()=>handleDelete(item._row)} className="bg-red-50 text-red-600 border-2 border-red-100 px-3 py-1.5 rounded-xl font-bold text-xs"><Trash2/></button></td>
+                        </tr>
                     ))}</tbody></table></div>
                 </div>
             );
@@ -327,7 +332,7 @@
             );
         }
 
-        function DashboardView({ activityData }) {
+        function Dashboard({ activityData }) {
             const stats = { act: activityData.filter(x=>x.狀態==='上架').length, assoc: 494, vendor: 32 };
             return (
                 <div className="p-8 fade-in">
@@ -359,15 +364,7 @@
             
             const fetchActivities = () => { callAPI('getActivityList').then(res => setActivityData(res.data || [])); };
             useEffect(() => { if(role==='admin') fetchActivities(); }, [role]);
-            const handleTakeDown = async (actName) => { 
-                const act = activityData.find(x => x['活動名稱'] === actName);
-                if (!act) return;
-                const nextState = act.狀態 === '上架' ? '下架' : '上架';
-                if(confirm(`確定要${nextState}「${actName}」嗎？`)){ 
-                    await callAPI('updateActivityStatus',{name:actName,status:nextState}); 
-                    fetchActivities(); 
-                } 
-            };
+            const handleTakeDown = async (actName) => { if(confirm(`確定下架「${actName}」?`)){ await callAPI('updateActivityStatus',{name:actName,status:'下架'}); fetchActivities(); } };
 
             if (role === "member") return <MemberLobby />;
 
@@ -391,7 +388,7 @@
                     <main className="flex-1 overflow-auto bg-[#f8fafc] no-scrollbar">
                         {selectedDetail ? <DetailPage activity={selectedDetail} onBack={()=>setSelectedDetail(null)} onRefresh={fetchActivities} /> : (
                             <Fragment>
-                                {view==='dashboard' && <DashboardView activityData={activityData} />}
+                                {view==='dashboard' && <Dashboard activityData={activityData} />}
                                 {view==='activity' && <ActivityConsole activityData={activityData} fetchActivities={fetchActivities} setSelectedDetail={setSelectedDetail} setCreateOpen={setCreateOpen} setReTarget={setReTarget} setLotTarget={setLotTarget} handleTakeDown={handleTakeDown} />}
                                 {view==='assoc' && <MemberTable title="協會正式會員名冊管理" sheetName="本業會員" />}
                                 {view==='vendor' && <MemberTable title="廠商贊助單位名冊管理" sheetName="廠商會員" />}
