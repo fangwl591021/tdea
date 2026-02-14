@@ -6,50 +6,48 @@
     <title>TDEA 報名登入</title>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f0f2f5; -webkit-tap-highlight-color: transparent; }
-        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-    </style>
+    <style>body{font-family:'Noto Sans TC',sans-serif;background-color:#f0f2f5}.fade-in{animation:fadeIn 0.4s ease-out forwards}@keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}</style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
     <div id="loader" class="text-center space-y-4">
         <div class="w-12 h-12 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mx-auto"></div>
-        <p class="text-emerald-800 font-bold tracking-widest">登入中...</p>
+        <p class="text-emerald-800 font-bold tracking-widest">身分核對中...</p>
     </div>
 
+    <!-- 綁定會員區 -->
     <div id="mainForm" class="hidden w-full max-w-sm fade-in">
         <div class="text-center mb-8">
-            <div class="w-20 h-20 bg-emerald-600 rounded-3xl shadow-xl flex items-center justify-center mx-auto mb-4"><i class="fa-solid fa-id-card-clip text-4xl text-white"></i></div>
+            <div class="w-20 h-20 bg-emerald-600 rounded-3xl shadow-xl flex items-center justify-center mx-auto mb-4 text-white text-4xl">🆔</div>
             <h1 class="text-2xl font-black text-emerald-900 tracking-tighter">活動專區註冊</h1>
-            <p class="text-gray-500 text-sm">首次使用請先綁定會員資料</p>
+            <p class="text-gray-500 text-sm">首次使用請先綁定資料</p>
         </div>
-
         <div class="bg-white p-8 rounded-[2.5rem] shadow-2xl space-y-6">
-            <div class="flex items-center gap-3 p-3 bg-emerald-50 rounded-2xl">
-                <img id="avatar" class="w-10 h-10 rounded-full border-2 border-white shadow-sm" src=""><p id="lineName" class="font-black text-emerald-800 text-lg">-</p>
-            </div>
+            <div class="flex items-center gap-3 p-3 bg-emerald-50 rounded-2xl"><img id="avatar" class="w-10 h-10 rounded-full"/><p id="lineName" class="font-bold text-gray-800">-</p></div>
             <div class="grid grid-cols-2 gap-2">
-                <button onclick="setType('本業會員')" id="tAssoc" class="py-3 rounded-2xl border-2 border-gray-100 font-bold text-gray-400">協會會員</button>
-                <button onclick="setType('廠商會員')" id="tVendor" class="py-3 rounded-2xl border-2 border-gray-100 font-bold text-gray-400">廠商會員</button>
-                <button onclick="setType('一般會員')" id="tGuest" class="col-span-2 py-3 rounded-2xl border-2 border-gray-100 font-bold text-gray-400">一般大眾註冊</button>
+                <button onclick="setType('本業會員')" id="tAssoc" class="py-3 rounded-2xl border-2 font-bold text-gray-400">協會會員</button>
+                <button onclick="setType('廠商會員')" id="tVendor" class="py-3 rounded-2xl border-2 font-bold text-gray-400">廠商會員</button>
+                <button onclick="setType('一般會員')" id="tGuest" class="col-span-2 py-3 rounded-2xl border-2 font-bold text-gray-400">一般大眾註冊</button>
             </div>
-            <div id="idInput" class="hidden space-y-1">
-                <label class="text-xs font-black text-gray-400 ml-1">會員編號</label>
-                <input id="memberId" type="text" placeholder="請輸入名冊編號" class="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-black outline-none focus:border-emerald-500 transition-all">
+            <div id="idInput" class="hidden"><label class="text-xs font-bold text-gray-400 ml-1">會員編號</label><input id="memberId" class="w-full bg-gray-50 border-2 p-3 rounded-xl font-bold outline-none focus:border-emerald-500"/></div>
+            <div><label class="text-xs font-bold text-gray-400 ml-1">手機號碼</label><input id="phone" type="tel" class="w-full bg-gray-50 border-2 p-3 rounded-xl font-bold outline-none focus:border-emerald-500"/></div>
+            <button onclick="submitBind()" id="submitBtn" class="w-full py-4 rounded-2xl font-black text-xl shadow-lg bg-emerald-600 text-white active:scale-95 transition">確認綁定</button>
+            
+            <!-- 申請管理員入口 -->
+            <div class="text-center pt-4 border-t">
+                <button onclick="showAdminReg()" class="text-xs text-gray-400 underline">申請管理員權限</button>
             </div>
-            <div class="space-y-1">
-                <label class="text-xs font-black text-gray-400 ml-1">聯絡手機</label>
-                <input id="phone" type="tel" placeholder="0912345678" maxlength="10" class="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-black outline-none focus:border-emerald-500 transition-all">
-            </div>
-            <button onclick="submitBind()" id="submitBtn" class="w-full py-5 rounded-3xl font-black text-xl shadow-lg bg-emerald-600 text-white active:scale-95 transition-all">確認綁定並登入</button>
         </div>
     </div>
 
-    <div id="success" class="hidden text-center space-y-6 fade-in">
-        <div class="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto shadow-xl"><i class="fa-solid fa-circle-check text-6xl text-emerald-500"></i></div>
-        <h2 class="text-3xl font-black text-emerald-900 tracking-tighter">登入成功</h2>
-        <p class="text-gray-500 font-bold italic animate-pulse">正在跳轉...</p>
+    <!-- 管理員申請區 -->
+    <div id="adminForm" class="hidden w-full max-w-sm fade-in">
+        <div class="text-center mb-6"><h2 class="text-xl font-black text-gray-800">申請管理員權限</h2><p class="text-xs text-gray-400">提交後請通知管理員審核</p></div>
+        <div class="bg-white p-8 rounded-[2.5rem] shadow-2xl space-y-4">
+             <div><label class="text-xs font-bold text-gray-400">真實姓名</label><input id="adminName" class="w-full border-2 p-3 rounded-xl font-bold"/></div>
+             <div><label class="text-xs font-bold text-gray-400">手機號碼</label><input id="adminPhone" type="tel" class="w-full border-2 p-3 rounded-xl font-bold"/></div>
+             <button onclick="submitAdmin()" class="w-full py-3 rounded-xl font-bold bg-gray-800 text-white shadow-lg">提交申請</button>
+             <button onclick="location.reload()" class="w-full py-3 text-gray-400 font-bold">返回</button>
+        </div>
     </div>
 
     <script>
@@ -65,19 +63,28 @@
                 uid = p.userId;
                 document.getElementById('avatar').src = p.pictureUrl;
                 document.getElementById('lineName').textContent = p.displayName;
-
-                const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'checkMemberBinding', userId: uid }) });
+                const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'check', userId: uid }) });
                 const data = await res.json();
-                if (data.isBound) { showSuccess(); } 
-                else { document.getElementById('loader').classList.add('hidden'); document.getElementById('mainForm').classList.remove('hidden'); }
+                
+                if (data.status === 'admin' || data.status === 'member') { 
+                    window.location.replace("index.html"); 
+                } else { 
+                    document.getElementById('loader').classList.add('hidden'); 
+                    document.getElementById('mainForm').classList.remove('hidden'); 
+                }
             } catch (e) { alert("連線失敗"); }
         };
 
         function setType(t) {
             curType = t;
-            ['tAssoc', 'tVendor', 'tGuest'].forEach(id => { document.getElementById(id).className = "py-3 rounded-2xl border-2 border-gray-100 font-bold text-gray-400 transition-all"; });
+            ['tAssoc', 'tVendor', 'tGuest'].forEach(id => document.getElementById(id).className = "py-3 rounded-2xl border-2 border-gray-100 font-bold text-gray-400 transition-all");
             document.getElementById(t === '本業會員' ? 'tAssoc' : (t === '廠商會員' ? 'tVendor' : 'tGuest')).className = "py-3 rounded-2xl border-2 border-emerald-500 bg-emerald-50 font-black text-emerald-600 shadow-sm transition-all";
             document.getElementById('idInput').style.display = (t === '一般會員') ? 'none' : 'block';
+        }
+
+        function showAdminReg() {
+            document.getElementById('mainForm').classList.add('hidden');
+            document.getElementById('adminForm').classList.remove('hidden');
         }
 
         async function submitBind() {
@@ -86,23 +93,22 @@
             if (!curType) return alert("請選擇身分");
             if (!tel) return alert("請輸入手機");
             if (curType !== '一般會員' && !mid) return alert("請輸入編號");
-
-            const btn = document.getElementById('submitBtn');
-            btn.disabled = true; btn.textContent = "處理中...";
-
+            
             try {
                 const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'bindMember', userId: uid, type: curType, memberId: mid, phone: tel, name: document.getElementById('lineName').textContent }) });
                 const result = await res.json();
-                if (result.success) { showSuccess(); } 
-                else { alert("失敗：" + result.message); btn.disabled = false; btn.textContent = "確認綁定並登入"; }
-            } catch (e) { alert("連線錯誤"); btn.disabled = false; }
+                if (result.success) { alert("綁定成功！"); window.location.replace("index.html"); } 
+                else { alert("綁定失敗：" + result.message); }
+            } catch (e) { alert("錯誤"); }
         }
 
-        function showSuccess() {
-            document.getElementById('loader').classList.add('hidden');
-            document.getElementById('mainForm').classList.add('hidden');
-            document.getElementById('success').classList.remove('hidden');
-            setTimeout(() => { window.location.replace("index.html"); }, 1200);
+        async function submitAdmin() {
+            const name = document.getElementById('adminName').value;
+            const phone = document.getElementById('adminPhone').value;
+            if(!name || !phone) return alert("請填寫完整");
+            await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'register', userId: uid, name, phone }) });
+            alert("申請已送出，請等待審核");
+            location.reload();
         }
     </script>
 </body>
