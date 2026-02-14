@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TDEA 報名登入</title>
+    <title>TDEA 登入</title>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>body{font-family:'Noto Sans TC',sans-serif;background-color:#f0f2f5}.fade-in{animation:fadeIn 0.4s ease-out forwards}@keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}</style>
@@ -11,15 +11,15 @@
 <body class="min-h-screen flex items-center justify-center p-4">
     <div id="loader" class="text-center space-y-4">
         <div class="w-12 h-12 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mx-auto"></div>
-        <p class="text-emerald-800 font-bold tracking-widest">身分核對中...</p>
+        <p class="text-emerald-800 font-bold tracking-widest">登入中...</p>
     </div>
 
     <!-- 綁定會員區 -->
     <div id="mainForm" class="hidden w-full max-w-sm fade-in">
         <div class="text-center mb-8">
             <div class="w-20 h-20 bg-emerald-600 rounded-3xl shadow-xl flex items-center justify-center mx-auto mb-4 text-white text-4xl">🆔</div>
-            <h1 class="text-2xl font-black text-emerald-900 tracking-tighter">活動專區註冊</h1>
-            <p class="text-gray-500 text-sm">首次使用請先綁定資料</p>
+            <h1 class="text-2xl font-black text-emerald-900 tracking-tighter">會員首次綁定</h1>
+            <p class="text-gray-500 text-sm">請驗證您的會員資料以開通權限</p>
         </div>
         <div class="bg-white p-8 rounded-[2.5rem] shadow-2xl space-y-6">
             <div class="flex items-center gap-3 p-3 bg-emerald-50 rounded-2xl"><img id="avatar" class="w-10 h-10 rounded-full"/><p id="lineName" class="font-bold text-gray-800">-</p></div>
@@ -32,7 +32,6 @@
             <div><label class="text-xs font-bold text-gray-400 ml-1">手機號碼</label><input id="phone" type="tel" class="w-full bg-gray-50 border-2 p-3 rounded-xl font-bold outline-none focus:border-emerald-500"/></div>
             <button onclick="submitBind()" id="submitBtn" class="w-full py-4 rounded-2xl font-black text-xl shadow-lg bg-emerald-600 text-white active:scale-95 transition">確認綁定</button>
             
-            <!-- 申請管理員入口 -->
             <div class="text-center pt-4 border-t">
                 <button onclick="showAdminReg()" class="text-xs text-gray-400 underline">申請管理員權限</button>
             </div>
@@ -55,6 +54,16 @@
         const API_URL = "https://tdea.fangwl591021.workers.dev/"; 
         let curType = "", uid = "";
 
+        // 🌟 核心：確保所有 API 呼叫都帶上 action
+        const callApi = async (action, data) => {
+            const res = await fetch(`${API_URL}?action=${action}&t=${Date.now()}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ action, ...data })
+            });
+            return await res.json();
+        };
+
         window.onload = async () => {
             try {
                 await liff.init({ liffId: LIFF_ID });
@@ -63,8 +72,7 @@
                 uid = p.userId;
                 document.getElementById('avatar').src = p.pictureUrl;
                 document.getElementById('lineName').textContent = p.displayName;
-                const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'check', userId: uid }) });
-                const data = await res.json();
+                const data = await callApi('check', { userId: uid });
                 
                 if (data.status === 'admin' || data.status === 'member') { 
                     window.location.replace("index.html"); 
@@ -72,7 +80,7 @@
                     document.getElementById('loader').classList.add('hidden'); 
                     document.getElementById('mainForm').classList.remove('hidden'); 
                 }
-            } catch (e) { alert("連線失敗"); }
+            } catch (e) { alert("連線失敗：" + e.message); }
         };
 
         function setType(t) {
@@ -94,19 +102,21 @@
             if (!tel) return alert("請輸入手機");
             if (curType !== '一般會員' && !mid) return alert("請輸入編號");
             
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true; btn.textContent = "處理中...";
+
             try {
-                const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'bindMember', userId: uid, type: curType, memberId: mid, phone: tel, name: document.getElementById('lineName').textContent }) });
-                const result = await res.json();
-                if (result.success) { alert("綁定成功！"); window.location.replace("index.html"); } 
-                else { alert("綁定失敗：" + result.message); }
-            } catch (e) { alert("錯誤"); }
+                const result = await callApi('bindMember', { userId: uid, type: curType, memberId: mid, phone: tel, name: document.getElementById('lineName').textContent });
+                if (result.success) { alert("登入成功！"); window.location.replace("index.html"); } 
+                else { alert("綁定失敗：" + result.message); btn.disabled = false; btn.textContent = "確認綁定"; }
+            } catch (e) { alert("錯誤"); btn.disabled = false; }
         }
 
         async function submitAdmin() {
             const name = document.getElementById('adminName').value;
             const phone = document.getElementById('adminPhone').value;
             if(!name || !phone) return alert("請填寫完整");
-            await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'register', userId: uid, name, phone }) });
+            await callApi('register', { userId: uid, name, phone });
             alert("申請已送出，請等待審核");
             location.reload();
         }
