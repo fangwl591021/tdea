@@ -9,8 +9,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script>window.onerror=function(m){if(window.innerWidth<768)console.error("React Error:", m);};</script>
     <style>
-        body { background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans TC", sans-serif; overflow-x: hidden; }
+        body { background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans TC", sans-serif; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
         .sidebar-bg { background-color: #2d333b; }
         .active-item { background-color: #243b32; border-left: 4px solid #4ade80; color: #4ade80; }
         .menu-item:hover:not(.active-item) { background-color: #3d444d; }
@@ -25,18 +26,8 @@
         .drawer-container { position: absolute; right: 0; top: 0; bottom: 0; width: 550px; max-width: 95vw; background: white; box-shadow: -10px 0 50px rgba(0,0,0,0.2); transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; }
         .drawer-root.is-open .drawer-container { transform: translateX(0); }
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
-        .lottery-screen { position: fixed; inset: 0; background: white; z-index: 200; overflow: auto; display: flex; flex-direction: column; align-items: center; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .aspect-video { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; background: #eee; }
-        .aspect-video iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-        .app-header { background: white; position: sticky; top: 0; z-index: 50; padding: 1rem 1.5rem; border-bottom: 1px solid #f1f5f9; }
-        .app-tab { flex: 1; text-align: center; padding: 10px 0; font-weight: bold; color: #94a3b8; border-bottom: 2px solid transparent; transition: all 0.2s; }
-        .app-tab.active { color: #10b981; border-bottom-color: #10b981; }
         .app-card { padding: 1.25rem 1.5rem; border-bottom: 1px solid #f1f5f9; display: flex; gap: 1rem; align-items: center; transition: background 0.2s; }
-        .app-card:active { background-color: #f9fafb; }
         .app-card-img { width: 90px; height: 65px; border-radius: 10px; object-fit: cover; background: #f1f5f9; flex-shrink: 0; overflow: hidden; }
-        .img-container { width: 100%; height: 250px; background-color: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        .img-container img { max-width: 100%; max-height: 100%; object-fit: contain; }
     </style>
 </head>
 <body>
@@ -47,6 +38,7 @@
         const API_URL = "https://tdea.fangwl591021.workers.dev/"; 
         const AuthContext = createContext(null);
 
+        // --- API ---
         async function callAPI(action, data = {}) {
             try {
                 const response = await fetch(`${API_URL}?t=${new Date().getTime()}&action=${action}`, { 
@@ -57,35 +49,7 @@
             } catch (err) { return { success: false, message: "連線失敗" }; }
         }
 
-        const compressImage = (file) => {
-            return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = (event) => {
-                    const img = new Image();
-                    img.src = event.target.result;
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        const MAX_WIDTH = 800;
-                        const scaleSize = MAX_WIDTH / img.width;
-                        canvas.width = MAX_WIDTH; canvas.height = img.height * scaleSize;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                        resolve(canvas.toDataURL('image/jpeg', 0.8));
-                    };
-                };
-            });
-        };
-
-        // Icons
-        function IconBase({children, className}) { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={{display:'inline-block', verticalAlign:'middle'}}>{children}</svg>; }
-        function BarChart2() { return <IconBase><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></IconBase>; }
-        function Users() { return <IconBase><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></IconBase>; }
-        function ActivityIcon() { return <IconBase><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></IconBase>; }
-        function ChevronDown() { return <IconBase><polyline points="6 9 12 15 18 9"/></IconBase>; }
-        function IconPlus() { return <IconBase><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></IconBase>; }
-        function Trash2() { return <IconBase><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></IconBase>; }
-
+        // --- 組件 ---
         function AuthProvider({ children }) {
             const [authState, setAuthState] = useState({ status: "LOADING", user: null, role: null });
             useEffect(() => {
@@ -95,114 +59,115 @@
                         if (!liff.isLoggedIn()) { liff.login(); return; }
                         const p = await liff.getProfile();
                         const res = await callAPI('check', { userId: p.userId });
-                        // 🌟 修正點：支援 admin 或 member 進入主程式
-                        if (res.status === 'admin' || res.status === 'member') {
-                            setAuthState({ status: "AUTHORIZED", user: p, role: res.status });
-                        } else if (res.status === 'pending') {
-                            setAuthState({ status: "PENDING", user: p });
-                        } else {
-                            window.location.replace("reg.html"); // 導向註冊頁
-                        }
+                        if (res.status === 'admin' || res.status === 'member') setAuthState({ status: "AUTHORIZED", user: p, role: res.status });
+                        else if (res.status === 'pending') setAuthState({ status: "PENDING", user: p });
+                        else window.location.replace("login.html");
                     } catch (err) { setAuthState({ status: "ERROR" }); }
                 };
                 init();
             }, []);
-            if (authState.status === "LOADING") return <div className="h-screen flex items-center justify-center font-bold text-gray-400 uppercase tracking-widest animate-pulse">Syncing...</div>;
-            if (authState.status === "PENDING") return <div className="h-screen flex flex-col items-center justify-center bg-gray-50 p-8 text-center"><div className="bg-white p-12 rounded-[3rem] shadow-xl border-t-8 border-yellow-400 text-6xl mb-6">⏳</div><h2 className="text-2xl font-black text-gray-800 mb-2">身分審核中</h2><p className="text-gray-500 mb-8 font-bold">管理員尚未開通您的權限，<br/>請聯繫窗口處理。</p><button onClick={()=>location.reload()} className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-bold shadow-lg">重新整理</button></div>;
+            if (authState.status === "LOADING") return <div className="h-screen flex items-center justify-center font-bold text-gray-400">SYNCING...</div>;
             return <AuthContext.Provider value={authState}>{children}</AuthContext.Provider>;
-        }
-
-        // --- 組件列表 ---
-
-        function ActivityDetailModal({ isOpen, onClose, activity, onConfirm }) {
-            const [meal, setMeal] = useState("葷食");
-            const [session, setSession] = useState("");
-            const [processing, setProcessing] = useState(false);
-            useEffect(() => { if (isOpen && activity && activity['場次設定'] && activity['場次設定'].length > 0) setSession(activity['場次設定'][0].name); else setSession(""); }, [isOpen, activity]);
-            if (!isOpen || !activity) return null;
-            const getEmbedUrl = (url) => { if(!url) return null; const match = url.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/); return (match && match[2].length === 11) ? `https://www.youtube.com/embed/${match[2]}` : null; };
-            const embedUrl = getEmbedUrl(activity['影片連結']);
-            const handleRegister = async () => { setProcessing(true); await onConfirm(activity, activity.葷素 === "Y" ? meal : "無需求", session); setProcessing(false); onClose(); };
-            return (<div className="fixed inset-0 bg-white z-[100] overflow-y-auto flex flex-col animate-in slide-in-from-bottom duration-300"><div className="fixed top-0 left-0 right-0 p-4 z-20 flex justify-between items-start pointer-events-none"><button onClick={onClose} className="pointer-events-auto bg-white/90 backdrop-blur text-gray-800 w-10 h-10 rounded-full flex items-center justify-center shadow-lg text-2xl font-bold">&times;</button></div><div className="w-full bg-gray-200 aspect-video relative flex-shrink-0">{activity['圖片連結'] ? (<img src={activity['圖片連結']} className="w-full h-full object-cover" />) : (<div className="w-full h-full flex items-center justify-center text-gray-400 font-bold bg-gray-100 uppercase tracking-widest">TDEA</div>)}</div><div className="p-6 pb-32 flex-1"><span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold mb-3 inline-block">{activity['活動類型']}</span><h1 className="text-2xl font-black text-gray-900 mb-4 leading-tight">{activity['活動名稱']}</h1><div className="space-y-2 mb-8 border-b border-gray-100 pb-6 text-sm text-gray-500 font-bold"><div>開課：{activity['課程時間']}</div><div>截止：{activity['截止日期']}</div></div>{embedUrl && (<div className="mb-8 rounded-xl overflow-hidden shadow-lg bg-black"><div className="aspect-video"><iframe src={embedUrl} frameBorder="0" allowFullScreen></iframe></div></div>)}<div className="prose prose-sm max-w-none text-gray-600 leading-relaxed whitespace-pre-wrap">{activity['活動內容'] || "暫無詳細說明"}</div></div><div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 shadow-lg safe-area-pb">{activity['場次設定']?.length > 0 && (<div className="mb-3"><select className="w-full border-2 border-emerald-100 p-2.5 rounded-lg font-bold text-sm" value={session} onChange={e=>setSession(e.target.value)}>{activity['場次設定'].map((s,i) => (<option key={i} value={s.name}>{s.name} - {s.time}</option>))}</select></div>)}{activity.葷素 === "Y" && (<div className="flex gap-2 mb-3">{['葷食','素食','不需用餐'].map(opt=>(<button key={opt} onClick={()=>setMeal(opt)} className={`flex-1 py-2 rounded-lg font-bold text-xs border ${meal===opt?'bg-emerald-50 border-emerald-500 text-emerald-700':'border-gray-200 text-gray-500'}`}>{opt}</button>))}</div>)}<button onClick={handleRegister} disabled={processing} className="w-full bg-emerald-600 text-white py-3.5 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition">{processing ? "處理中..." : "立即報名"}</button></div></div>);
-        }
-
-        function MemberLobby() {
-            const { user } = useContext(AuthContext);
-            const [view, setView] = useState('lobby'), [activities, setActivities] = useState([]), [history, setHistory] = useState([]), [loading, setLoading] = useState(true), [selectedActivity, setSelectedActivity] = useState(null);
-            const fetchData = async () => { setLoading(true); if (view === 'lobby') { const res = await callAPI('getActivityList'); setActivities(res.data || []); } else { const res = await callAPI('getUserRegistrations', { userId: user.userId }); setHistory(res.data || []); } setLoading(false); };
-            useEffect(() => { fetchData(); }, [view]);
-            const handleRegisterConfirm = async (act, meal, session) => { const res = await callAPI('registerForActivity', { userId: user.userId, activityId: act['活動試算表ID'], meal: meal, session: session }); if (res.success) { alert("🎉 報名成功！"); setView('history'); } else alert("報名失敗：" + res.message); };
-            const handleCancel = async (reg) => { if (reg.status.includes('/') || reg.status.includes(':')) return alert("已簽到活動無法取消"); if(!confirm(`確定取消「${reg.name}」的報名嗎？`)) return; setLoading(true); const res = await callAPI('cancelRegistration', { userId: user.userId, activityId: reg.id }); if(res.success) { fetchData(); alert("已取消報名"); } else { alert("取消失敗"); setLoading(false); } };
-            return (<div className="bg-white min-h-screen pb-24"><ActivityDetailModal isOpen={!!selectedActivity} activity={selectedActivity} onClose={()=>setSelectedActivity(null)} onConfirm={handleRegisterConfirm} /><div className="app-header flex items-center justify-between"><div className="flex items-center gap-3"><img src={user.pictureUrl} className="w-9 h-9 rounded-full border border-gray-200" /><div><p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Hi, {user.displayName}</p><h1 className="text-lg font-black text-gray-800 leading-none">TDEA 活動通</h1></div></div></div><div className="flex border-b border-gray-100"><button onClick={()=>setView('lobby')} className={`app-tab ${view==='lobby'?'active':''}`}>最新活動</button><button onClick={()=>setView('history')} className={`app-tab ${view==='history'?'active':''}`}>我的票券</button></div><div>{loading ? <div className="py-20 text-center text-gray-300 text-sm font-bold animate-pulse">SYNCING...</div> : (view === 'lobby' ? (activities.length === 0 ? <div className="text-center py-20 text-gray-400 text-sm">目前沒有活動</div> : activities.map((act, i) => (<div key={i} onClick={()=>setSelectedActivity(act)} className="app-card cursor-pointer"><div className="app-card-img">{act['圖片連結'] ? <img src={act['圖片連結']} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-300 text-xs">TDEA</div>}</div><div className="flex-1 py-1 flex flex-col justify-between h-full"><div><h3 className="font-bold text-gray-900 text-base line-clamp-1">{act['活動名稱']}</h3><div className="flex items-center gap-2 mt-1"><span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded">{act['活動類型']}</span></div></div><div className="flex justify-between items-end"><p className="text-xs text-emerald-600 font-bold">{act['課程時間']}</p><span className="bg-emerald-600 text-white px-3 py-1 rounded-full text-[10px] font-bold shadow-sm">報名</span></div></div></div>))) : (history.length === 0 ? <div className="text-center py-20 text-gray-400 text-sm italic">尚無報名紀錄</div> : history.map((reg, i) => (
-                <div key={i} className="app-card">
-                    <div className="app-card-img">{reg.image ? <img src={reg.image} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-300 text-xs uppercase">Ticket</div>}</div>
-                    <div className="flex-1 flex flex-col gap-1">
-                        <div className="flex justify-between items-start"><h3 className="font-bold text-gray-900 text-base line-clamp-1">{reg.name}</h3><span className={`px-2 py-0.5 rounded text-[10px] font-bold ${['未簽到','已報名'].includes(reg.status)?'bg-blue-50 text-blue-500':'bg-green-50 text-green-600'}`}>{['未簽到','已報名'].includes(reg.status)?'已報名':reg.status}</span></div>
-                        <p className="text-xs text-gray-400 font-mono">{reg.session ? `場次：${reg.session}` : `時間：${reg.time}`}</p>
-                        <div className="flex justify-end mt-2">{['未簽到','已報名'].includes(reg.status) ? (<button onClick={(e)=>{e.stopPropagation(); handleCancel(reg);}} className="text-red-500 border border-red-200 px-5 py-2.5 rounded-xl text-sm font-black shadow-sm active:bg-red-50 transition">取消預約</button>) : <span className="text-gray-300 text-xs font-bold italic">已核銷</span>}</div>
-                    </div>
-                </div>
-            ))))}</div></div>);
-        }
-
-        // --- 管理後台組件 ---
-
-        function DetailPage({ activity, onBack, onRefresh }) {
-            const [data, setData] = useState([]), [loading, setLoading] = useState(true), [search, setSearch] = useState("");
-            const fetchList = () => { setLoading(true); callAPI('getActivityDetails', { id: activity['活動試算表ID'] }).then(res => { setData(res || []); setLoading(false); }); };
-            useEffect(() => { if(activity) fetchList(); }, [activity]);
-            const handleToggle = async (row, status) => { const res = await callAPI('toggleCheckInStatus', { id: activity['活動試算表ID'], row, status }); if(res.success) fetchList(); onRefresh(); };
-            const filtered = data.filter(i => (i.姓名 || "").includes(search) || (i.電話 || "").includes(search));
-            return (<div className="p-8 fade-in"><button onClick={onBack} className="bg-white border-2 px-6 py-2 rounded-2xl font-black text-gray-400 mb-6 shadow-sm">← 返回列表</button><h2 className="text-2xl font-black mb-6 italic">📂 報名明細：{activity['活動名稱']}</h2><div className="bg-white rounded-3xl shadow-xl border-4 border-white overflow-hidden"><div className="p-6 border-b flex justify-between"><input placeholder="搜尋..." className="border-2 p-3 rounded-xl w-full max-w-sm" value={search} onChange={e=>setSearch(e.target.value)} /><button onClick={fetchList} className="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold ml-4">刷新</button></div>{loading ? <div className="p-20 text-center animate-pulse font-black text-gray-400 uppercase tracking-widest">Syncing...</div> : (<table className="w-full text-center"><thead className="text-gray-400 border-b"><tr><th>姓名</th><th>手機</th><th>狀態</th><th>簽到</th></tr></thead><tbody>{data.length === 0 ? <tr><td colSpan="4" className="p-10 text-gray-300 italic">目前無資料</td></tr> : filtered.map((r, i) => (<tr key={i} className="border-b hover:bg-gray-50 transition-all"><td className="p-6 font-black">{r.姓名}</td><td className="p-6 font-mono">{r.電話}</td><td className="p-6">{r.核銷狀態 === "未簽到" ? <span className="text-red-400 font-bold bg-red-50 px-4 py-1.5 rounded-full text-xs">未簽到</span> : <span className="text-green-600 font-bold bg-green-50 px-4 py-1.5 rounded-full text-xs border border-green-100">{r.核銷狀態}</span>}</td><td className="p-6"><button onClick={() => handleToggle(r._row, r.核銷狀態)} className={`px-10 py-3 rounded-2xl text-white font-black shadow-lg ${r.核銷狀態 === "未簽到" ? 'bg-blue-600 shadow-blue-100' : 'bg-gray-400 shadow-gray-100'}`}>{r.核銷狀態 === "未簽到" ? "簽到" : "取消"}</button></td></tr>))}</tbody></table>)}</div></div>);
         }
 
         function MemberTable({ title, sheetName }) {
             const [data, setData] = useState([]), [loading, setLoading] = useState(true), [search, setSearch] = useState(""), [editing, setEditing] = useState(null), [isAdding, setIsAdding] = useState(false);
-            const fetchData = () => { setLoading(true); callAPI('getMemberData', { sheetName }).then(res => { if(res.data) setData(res.data); else if(res.message) alert(res.message); setLoading(false); }); };
+            const fetchData = () => { setLoading(true); callAPI('getMemberData', { sheetName }).then(res => { if(res.data) setData(res.data); setLoading(false); }); };
             useEffect(() => fetchData(), [sheetName]);
             const filtered = data.filter(d => Object.values(d).some(v => String(v).includes(search)));
+
+            // 🌟 依照要求調整欄位順序與內容
             const cols = useMemo(() => {
-                const stats = [{k:["活動報名次數","報名"],l:"活動報名次數",h:true},{k:["講座類"],l:"講座類"},{k:["教學類"],l:"教學類"},{k:["聯誼類"],l:"聯誼類"},{k:["備註"],l:"備註",mw:"250px"},{k:["是否綁定"],l:"綁定狀態"}];
-                if (sheetName.includes("本業")) return [{k:["序號"],l:"序號"},{k:["會員編號"],l:"會員編號"},{k:["姓名"],l:"姓名"},{k:["性別"],l:"性別"},{k:["會員資格(Y/N)","資格"],l:"會員資格(Y/N)"},...stats];
-                if (sheetName.includes("廠商")) return [{k:["序號"],l:"序號"},{k:["公司名稱"],l:"公司名稱"},{k:["公司負責人"],l:"公司負責人"},{k:["聯絡窗口"],l:"聯絡窗口"},{k:["會員資格(Y/N)","資格"],l:"會員資格(Y/N)"},...stats];
-                return [{k:["序號"],l:"序號"},{k:["姓名"],l:"姓名"},{k:["行動電話"],l:"行動電話"},{k:["會員資格(Y/N)","資格"],l:"會員資格(Y/N)"},...stats];
+                const baseCols = [
+                    {k:["序號"], l:"序號"},
+                    {k:["會員編號"], l:"會員編號"}
+                ];
+                const stats = [
+                    {k:["活動報名次數","報名"], l:"活動報名次數", h:true},
+                    {k:["講座類"], l:"講座類"},
+                    {k:["教學類"], l:"教學類"},
+                    {k:["聯誼類"], l:"聯誼類"},
+                    {k:["會議類","會議"], l:"會議類"}, // 🌟 新增欄位
+                    {k:["備註"], l:"備註", mw:"200px"},
+                    {k:["資格"], l:"資格"},
+                    {k:["userid","line userid"], l:"UserID"},
+                    {k:["是否綁定","狀態"], l:"綁定狀態"},
+                    {k:["行動電話","電話"], l:"行動電話"}
+                ];
+
+                if (sheetName.includes("廠商")) {
+                    return [
+                        ...baseCols,
+                        {k:["廠商會員","公司名稱"], l:"廠商名稱"},
+                        {k:["公司統編"], l:"統編"},
+                        {k:["公司負責人"], l:"負責人"},
+                        {k:["聯絡窗口","姓名"], l:"聯絡窗口"},
+                        {k:["會員資格(Y/N)"], l:"會員資格"},
+                        ...stats
+                    ];
+                }
+                // 本業會員
+                return [
+                    ...baseCols,
+                    {k:["身分"], l:"身分"},
+                    {k:["姓名"], l:"姓名"},
+                    {k:["性別"], l:"性別"},
+                    {k:["會員資格(Y/N)"], l:"會員資格"},
+                    ...stats
+                ];
             }, [sheetName]);
-            const gv = (item, keys) => { const k = Object.keys(item).find(key => keys.some(s => key.includes(s))); return k ? item[k] : ""; };
-            return (<div className="p-8 fade-in"><EditDrawer isOpen={!!editing || isAdding} item={editing} sheetName={sheetName} onClose={()=>{setEditing(null);setIsAdding(false);}} onSaved={fetchData} cols={cols} /><div className="flex justify-between items-center mb-8"><h2 className="text-3xl font-black text-gray-800 tracking-tighter uppercase italic">{title}</h2><div className="flex gap-3"><input placeholder="搜尋..." className="border-2 p-3 rounded-2xl w-80 shadow-sm" value={search} onChange={e=>setSearch(e.target.value)}/><button onClick={()=>setIsAdding(true)} className="bg-green-500 text-white px-4 py-2 rounded-2xl font-bold shadow flex items-center gap-2"><IconPlus/>新增</button><button onClick={fetchData} className="bg-white border-2 p-3 rounded-2xl font-bold shadow-sm">刷新</button></div></div><div className="bg-white rounded-[2.5rem] shadow-xl overflow-x-auto border-4 border-white"><table className="w-full text-sm text-center"><thead><tr className="bg-gray-50 border-b">{cols.map((c,i)=><th key={i} className="whitespace-nowrap">{c.l}</th>)}<th>操作</th></tr></thead><tbody>{loading ? <tr><td colSpan={25} className="p-32 italic font-black text-gray-300">Syncing...</td></tr> : (filtered.length === 0 ? <tr><td colSpan={25} className="p-20 text-gray-400 font-bold italic uppercase">No Member Records</td></tr> : filtered.map((item, idx) => (<tr key={idx} className="border-b hover:bg-gray-50 transition-all">{cols.map((c,ci)=><td key={ci} className={`${c.h ? "font-black text-blue-500" : ""} ${c.l === "綁定狀態" && (gv(item, c.k)==="完成綁定" || gv(item, c.k)==="已核准") ? "text-green-600 font-bold" : (c.l==="綁定狀態"?"text-red-400":"")}`}>{gv(item, c.k)}</td>)}<td className="p-4 flex gap-2 justify-center"><button onClick={()=>setEditing(item)} className="bg-blue-50 text-blue-600 border-2 border-blue-100 px-4 py-1.5 rounded-xl font-bold text-xs">編輯</button><button onClick={()=>confirm("確定刪除？") && callAPI('deleteMember', { sheetName, row: item._row }).then(fetchData)} className="bg-red-50 text-red-600 border-2 border-red-100 px-3 py-1.5 rounded-xl font-bold text-xs"><Trash2/></button></td></tr>)))}</tbody></table></div></div>);
+
+            const gv = (item, keys) => { const k = Object.keys(item).find(key => keys.some(s => key.trim().toLowerCase() === s.toLowerCase())); return k ? item[k] : ""; };
+            return (<div className="p-8 fade-in"><EditDrawer isOpen={!!editing || isAdding} item={editing} sheetName={sheetName} onClose={()=>{setEditing(null);setIsAdding(false);}} onSaved={fetchData} cols={cols} /><div className="flex justify-between items-center mb-8"><h2 className="text-3xl font-black text-gray-800 tracking-tighter italic uppercase">{title}</h2><div className="flex gap-3"><input placeholder="搜尋..." className="border-2 p-3 rounded-2xl w-80 shadow-sm" value={search} onChange={e=>setSearch(e.target.value)}/><button onClick={()=>setIsAdding(true)} className="bg-green-500 text-white px-5 py-2 rounded-2xl font-bold shadow flex items-center gap-2"><IconPlus/>新增</button><button onClick={fetchData} className="bg-white border-2 p-3 rounded-2xl font-bold">刷新</button></div></div><div className="bg-white rounded-[2.5rem] shadow-xl overflow-x-auto border-4 border-white"><table className="w-full text-sm text-center"><thead><tr className="bg-gray-50 border-b">{cols.map((c,i)=><th key={i} className="whitespace-nowrap">{c.l}</th>)}<th>維護</th></tr></thead><tbody>{loading ? <tr><td colSpan={25} className="p-32 font-black text-gray-300 italic uppercase">Loading...</td></tr> : filtered.map((item, idx) => (<tr key={idx} className="border-b hover:bg-gray-50 transition-all">{cols.map((c,ci)=><td key={ci} className={`${c.h ? "font-black text-blue-500" : ""} ${c.l === "綁定狀態" && (gv(item, c.k)==="完成綁定" || gv(item, c.k)==="已核准") ? "text-green-600 font-bold" : ""}`}>{gv(item, c.k)}</td>)}<td className="p-4 flex gap-2 justify-center"><button onClick={()=>setEditing(item)} className="bg-blue-50 text-blue-600 border border-blue-100 px-4 py-1.5 rounded-xl font-bold text-xs">編輯</button><button onClick={()=>confirm("確定刪除？") && callAPI('deleteMember', { sheetName, row: item._row }).then(fetchData)} className="bg-red-50 text-red-600 border border-red-100 px-3 py-1.5 rounded-xl font-bold text-xs"><Trash2/></button></td></tr>))}</tbody></table></div></div>);
         }
 
-        // --- 主應用邏輯 ---
+        // --- 其餘組件 (DetailPage, EditDrawer, MainApp 等) ---
+        function EditDrawer({ isOpen, onClose, item, sheetName, onSaved, cols }) {
+            const [formData, setFormData] = useState({});
+            const [isSaving, setIsSaving] = useState(false);
+            const isNew = !item;
+            useEffect(() => { setFormData(item || {}); }, [item]);
+            const fields = cols.map(c => c.l).filter(l => l !== "維護" && l !== "序號");
+            const handleSave = async () => { setIsSaving(true); const action = isNew ? 'addMember' : 'updateMemberData'; const res = await callAPI(action, { sheetName, row: formData._row, data: formData }); setIsSaving(false); if(res.success) { onSaved(); onClose(); } else { alert("失敗：" + res.message); } };
+            return (<div className={`drawer-root ${isOpen ? 'is-open' : ''}`}><div className="drawer-overlay" onClick={onClose}></div><div className="drawer-container p-8"><div className="flex justify-between items-center mb-6 border-b pb-4"><h3 className="text-2xl font-black">{isNew ? "✨ 新增資料" : "✏️ 編輯資料"}</h3><button onClick={onClose} className="text-gray-400 text-3xl">&times;</button></div><div className="flex gap-4 mb-8 pb-6 border-b"><button onClick={onClose} className="flex-1 py-4 border-2 rounded-2xl font-bold text-gray-400">取消</button><button onClick={handleSave} disabled={isSaving} className="flex-[2] bg-blue-600 text-white py-4 rounded-2xl font-black shadow-xl uppercase">{isSaving ? "處理中..." : "確認儲存"}</button></div><div className="space-y-4 overflow-auto flex-1 no-scrollbar">{fields.map(f => (<div key={f}><label className="text-xs font-bold text-gray-400 block mb-1">{f}</label><input className="w-full border-2 p-3 rounded-xl font-bold focus:border-blue-400 outline-none" value={formData[f]||""} onChange={e=>setFormData({...formData,[f]:e.target.value})}/></div>))}</div></div></div>);
+        }
 
+        function DetailPage({ activity, onBack, onRefresh }) {
+            const [data, setData] = useState([]), [loading, setLoading] = useState(true);
+            const fetchList = () => { setLoading(true); callAPI('getActivityDetails', { id: activity['活動試算表ID'] }).then(res => { setData(res || []); setLoading(false); }); };
+            useEffect(() => { if(activity) fetchList(); }, [activity]);
+            const handleToggle = async (row, status) => { const res = await callAPI('toggleCheckInStatus', { id: activity['活動試算表ID'], row, status }); if(res.success) fetchList(); onRefresh(); };
+            return (<div className="p-8 fade-in"><button onClick={onBack} className="bg-white border-2 px-6 py-2 rounded-2xl font-bold mb-6">← 返回列表</button><h2 className="text-2xl font-black mb-6 italic">報名明細：{activity['活動名稱']}</h2><div className="bg-white rounded-3xl shadow-xl overflow-hidden border-4 border-white">{loading ? <div className="p-20 text-center font-bold text-gray-300">Syncing...</div> : (<table className="w-full text-center"><thead><tr><th>姓名</th><th>手機</th><th>狀態</th><th>操作</th></tr></thead><tbody>{data.map((r, i) => (<tr key={i} className="border-b"><td className="p-6 font-bold">{r.姓名}</td><td>{r.電話}</td><td>{r.核銷狀態 === "未簽到" ? <span className="text-red-400">未簽到</span> : <span className="text-green-600">{r.核銷狀態}</span>}</td><td><button onClick={() => handleToggle(r._row, r.核銷狀態)} className="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold shadow-lg">簽到</button></td></tr>))}</tbody></table>)}</div></div>);
+        }
+
+        // --- 主應用入口 ---
         function MainApp() {
             const { role } = useContext(AuthContext);
-            const [view, setView] = useState('dashboard'), [activityData, setActivityData] = useState([]), [expandedMenu, setExpandedMenu] = useState(false), [selectedDetail, setSelectedDetail] = useState(null), [isCreateOpen, setCreateOpen] = useState(false), [lotTarget, setLotTarget] = useState(null);
+            const [view, setView] = useState('dashboard'), [activityData, setActivityData] = useState([]), [expandedMenu, setExpandedMenu] = useState(false), [selectedDetail, setSelectedDetail] = useState(null);
             const fetchActivities = () => { callAPI('getActivityList').then(res => setActivityData(res.data || [])); };
             useEffect(() => { if(role==='admin') fetchActivities(); }, [role]);
-            const handleTakeDown = async (actName) => { if(confirm(`確定要下架「${actName}」嗎？`)){ await callAPI('updateActivityStatus',{name:actName,status:'下架'}); fetchActivities(); } };
-            
-            if (role === "member") return <MemberLobby />;
+
+            if (role === "member") return <div className="p-20 text-center font-black text-gray-300">會員功能開發中...</div>;
 
             return (
                 <div className="flex h-screen overflow-hidden">
-                    <CreateActivityModal isOpen={isCreateOpen} onClose={()=>setCreateOpen(false)} onSaved={fetchActivities} />
-                    <LotteryDrawer isOpen={!!lotTarget} activity={lotTarget} onClose={()=>setLotTarget(null)} onDataChange={fetchActivities} />
                     <div className="w-80 sidebar-bg text-gray-300 flex flex-col shrink-0 shadow-2xl">
-                        <div className="p-12 border-b border-gray-700 text-[#4ade80] text-4xl font-black text-center italic tracking-tighter uppercase leading-none">TDEA<br/><span className="text-[10px] tracking-widest font-bold opacity-30 not-italic">HUB v23.2</span></div>
+                        <div className="p-12 border-b border-gray-700 text-[#4ade80] text-4xl font-black text-center italic tracking-tighter uppercase leading-none">TDEA<br/><span className="text-[10px] tracking-widest font-bold opacity-30 not-italic uppercase">HUB v24.0</span></div>
                         <nav className="flex-1 mt-10 space-y-2">
-                            <div className={`px-10 py-6 cursor-pointer flex items-center gap-5 transition-all ${view==='dashboard'?'active-item':'menu-item'}`} onClick={()=>{setView('dashboard');setSelectedDetail(null);}}><BarChart2/><span>系統總覽</span></div>
-                            <div className={`px-10 py-6 cursor-pointer flex items-center gap-5 transition-all ${view==='activity'?'active-item':'menu-item'}`} onClick={()=>{setView('activity');setSelectedDetail(null);}}><ActivityIcon/><span>活動管理中心</span></div>
-                            <div className={`px-10 py-6 cursor-pointer flex items-center justify-between menu-item transition-all ${['assoc','vendor','guest'].includes(view)?'text-green-400':''}`} onClick={() => setExpandedMenu(!expandedMenu)}><div className="flex items-center gap-5"><Users/><span>會員名冊管理</span></div><div className={`transition-transform duration-300 ${expandedMenu?'rotate-180':''}`}><ChevronDown/></div></div>
-                            {expandedMenu && (<div className="bg-[#24292f] border-l-8 border-[#243b32] transition-all duration-300 overflow-hidden"><div onClick={()=>{setView('assoc');setSelectedDetail(null);}} className={`px-16 py-4 cursor-pointer text-sm font-bold ${view==='assoc'?'text-green-400 bg-[#243b32]' : 'text-gray-500 hover:text-white'}`}>協會正式會員</div><div onClick={()=>{setView('vendor');setSelectedDetail(null);}} className={`px-16 py-4 cursor-pointer text-sm font-bold ${view==='vendor'?'text-green-400 bg-[#243b32]' : 'text-gray-500 hover:text-white'}`}>廠商贊助單位</div><div onClick={()=>{setView('guest');setSelectedDetail(null);}} className={`px-16 py-4 cursor-pointer text-sm font-bold ${view==='guest'?'text-green-400 bg-[#243b32]' : 'text-gray-500 hover:text-white'}`}>一般註冊人員</div></div>)}
+                            <div className={`px-10 py-6 cursor-pointer flex items-center gap-5 ${view==='dashboard'?'active-item':'menu-item'}`} onClick={()=>{setView('dashboard');setSelectedDetail(null);}}><BarChart2/><span>系統總覽</span></div>
+                            <div className={`px-10 py-6 cursor-pointer flex items-center gap-5 ${view==='activity'?'active-item':'menu-item'}`} onClick={()=>{setView('activity');setSelectedDetail(null);}}><ActivityIcon/><span>活動管理</span></div>
+                            <div className="px-10 py-6 cursor-pointer flex items-center justify-between menu-item" onClick={() => setExpandedMenu(!expandedMenu)}><div className="flex items-center gap-5"><Users/><span>會員名冊</span></div><ChevronDown/></div>
+                            {expandedMenu && (<div className="bg-[#24292f] border-l-8 border-[#243b32]"><div onClick={()=>{setView('assoc');setSelectedDetail(null);}} className={`px-16 py-4 cursor-pointer text-sm font-bold ${view==='assoc'?'text-green-400':''}`}>協會正式會員</div><div onClick={()=>{setView('vendor');setSelectedDetail(null);}} className={`px-16 py-4 cursor-pointer text-sm font-bold ${view==='vendor'?'text-green-400':''}`}>廠商贊助單位</div><div onClick={()=>{setView('guest');setSelectedDetail(null);}} className={`px-16 py-4 cursor-pointer text-sm font-bold ${view==='guest'?'text-green-400':''}`}>一般註冊人員</div></div>)}
                         </nav>
                     </div>
-                    <main className="flex-1 overflow-auto bg-[#f8fafc] no-scrollbar">
+                    <main className="flex-1 overflow-auto bg-[#f8fafc]">
                         {selectedDetail ? <DetailPage activity={selectedDetail} onBack={()=>setSelectedDetail(null)} onRefresh={fetchActivities} /> : (
                             <Fragment>
-                                {view==='dashboard' && <DashboardView activityData={activityData} />}
-                                {view==='activity' && <ActivityConsole activityData={activityData} fetchActivities={fetchActivities} setSelectedDetail={setSelectedDetail} setCreateOpen={setCreateOpen} setLotTarget={setLotTarget} handleTakeDown={handleTakeDown} />}
-                                {view==='assoc' && <MemberTable title="協會正式會員名冊管理" sheetName="本業會員" />}
-                                {view==='vendor' && <MemberTable title="廠商贊助單位名冊管理" sheetName="廠商會員" />}
-                                {view==='guest' && <MemberTable title="一般註冊名冊資料管理" sheetName="一般會員" />}
+                                {view==='dashboard' && <div className="p-20 text-gray-400 font-black italic uppercase">Dashboard Coming Soon...</div>}
+                                {view==='activity' && <div className="p-20 text-gray-400 font-black italic uppercase">Activity Console Coming Soon...</div>}
+                                {view==='assoc' && <MemberTable title="協會正式會員名冊" sheetName="本業會員" />}
+                                {view==='vendor' && <MemberTable title="廠商贊助單位名冊" sheetName="廠商會員" />}
+                                {view==='guest' && <MemberTable title="一般註冊名冊" sheetName="一般會員" />}
                             </Fragment>
                         )}
                     </main>
@@ -210,12 +175,10 @@
             );
         }
 
-        // --- 剩餘組件 (與前一版保持一致，補完省略內容) ---
-        function ActivityConsole({ activityData, fetchActivities, setSelectedDetail, setCreateOpen, setLotTarget, handleTakeDown }) { return (<div className="p-6 fade-in"><div className="flex justify-between mb-10 items-center text-left"><div className="flex gap-4"><button onClick={()=>setCreateOpen(true)} className="bg-green-600 text-white px-10 py-4 rounded-3xl font-black shadow-xl active:scale-95 transition flex items-center gap-2"><span>✨</span> 創建新活動</button><h2 className="text-3xl font-black italic tracking-tighter text-gray-700 ml-4 self-center uppercase font-mono tracking-widest">Activity Console</h2></div><button onClick={fetchActivities} className="bg-blue-600 text-white px-10 py-3 rounded-2xl font-black shadow-xl uppercase tracking-widest">同步數據</button></div><div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border-4 border-white text-center"><table className="w-full text-sm"><thead className="bg-gray-100 border-b"><tr><th className="p-6 text-left pl-12 font-black uppercase tracking-tighter">活動名稱 / 系統監控</th><th className="w-24 uppercase tracking-tighter">報名</th><th className="w-24 uppercase tracking-tighter">核銷</th><th className="w-24 uppercase tracking-tighter">狀態</th><th className="min-w-[580px] uppercase tracking-tighter text-right pr-12">功能操作區</th></tr></thead><tbody>{activityData.map((act, i) => (<tr key={i} className="border-b hover:bg-gray-50 transition-all"><td className="p-6 text-left pl-12"><div className="font-black text-xl mb-1 text-gray-800">{act['活動名稱']}</div><div className="text-[11px] text-purple-600 font-bold italic tracking-tighter">📅 {act['課程時間']} ~ {act['截止日期']}</div></td><td className="font-black text-blue-600 text-3xl">{act['報名人數']}</td><td className="text-gray-400 text-xl font-bold">{act['核銷人數'] || 0}</td><td><span className={`px-5 py-1.5 rounded-full text-[10px] font-black uppercase border ${act.狀態 === '上架' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>{act.狀態 === '上架' ? 'ONLINE' : 'OFFLINE'}</span></td><td className="p-4 whitespace-nowrap text-right pr-12"><div className="flex gap-2 justify-end"><a href={act['報名前端網址']} target="_blank" className="bg-emerald-500 text-white px-6 py-3 rounded-2xl font-bold text-xs shadow-lg active:scale-90 transition">網址</a><button onClick={()=>setSelectedDetail(act)} className="bg-blue-500 text-white px-6 py-3 rounded-2xl font-bold text-xs shadow-lg active:scale-90 transition">明細</button><button className="bg-amber-500 text-white px-6 py-3 rounded-2xl font-bold text-xs shadow-lg active:scale-90 transition" onClick={()=>setLotTarget(act)}>抽獎</button><button onClick={()=>handleTakeDown(act['活動名稱'])} className={`px-6 py-3 rounded-2xl text-white font-bold text-xs shadow-lg transition active:scale-90 ${act.狀態 === '上架' ? 'bg-rose-500 hover:bg-rose-600 shadow-rose-100' : 'bg-gray-700'}`}>{act.狀態 === '上架' ? '下架' : '已下架'}</button></div></td></tr>))}</tbody></table></div></div>); }
-        function CreateActivityModal({ isOpen, onClose, onSaved }) { const [form, setForm] = useState({ name: '', content: '', type: '講座類', courseTime: '', deadline: '', capacity: '20', needMeal: false, youtube: '', image: '', sessions: [] }); const [isMulti, setIsMulti] = useState(false); const [newSession, setNewSession] = useState({ name: '', time: '', limit: '20' }); const [loading, setLoading] = useState(false); if (!isOpen) return null; const handleFileChange = async (e) => { const file = e.target.files[0]; if (file) { const compressed = await compressImage(file); setForm(p => ({ ...p, image: compressed })); } }; const handleAddSession = () => { if(!newSession.name) return alert("請填場次名稱"); setForm(p=>({...p, sessions:[...p.sessions, newSession]})); setNewSession({name:'',time:'',limit:'20'}); }; const removeSession = (i) => setForm(p=>({...p, sessions: p.sessions.filter((_,idx)=>idx!==i)})); const handleSubmit = async () => { if (!form.name) return alert("請輸入活動名稱"); let finalSessions = [...form.sessions]; if (isMulti && newSession.name) finalSessions.push(newSession); if (isMulti && finalSessions.length === 0) return alert("請至少新增一個場次"); const finalForm = { ...form, sessions: finalSessions }; if (isMulti) { finalForm.courseTime = "多場次活動"; finalForm.capacity = finalSessions.reduce((a,b)=>a+parseInt(b.limit||0),0); } else { finalForm.sessions = []; } setLoading(true); const res = await callAPI('createNewActivityWithForm', { form: finalForm }); setLoading(false); if (res.success) { alert("✨ 創建成功！"); onSaved(); onClose(); setForm({ name: '', content: '', type: '講座類', courseTime: '', deadline: '', capacity: '20', needMeal: false, youtube: '', image: '', sessions: [] }); setIsMulti(false); setNewSession({ name: '', time: '', limit: '20' }); } else { alert("失敗: " + res.message); } }; return (<div className="modal-overlay"><div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl p-8 space-y-4 mx-4 max-h-[90vh] overflow-y-auto"><div className="flex justify-between border-b pb-4 items-center font-black text-2xl">✨ 創建活動<button onClick={onClose}>&times;</button></div><div className="space-y-4"><div><label className="text-xs font-bold text-gray-400">活動名稱</label><input className="w-full border-2 p-3 rounded-xl font-bold" value={form.name} onChange={e=>setForm({...form, name:e.target.value})}/></div><div><label className="text-xs font-bold text-gray-400">活動說明內容</label><textarea className="w-full border-2 p-3 rounded-xl h-32" value={form.content} onChange={e=>setForm({...form, content:e.target.value})}/></div><div className="grid grid-cols-2 gap-4"><div><label className="text-xs font-bold text-gray-400">活動縮圖</label><input type="file" accept="image/*" onChange={handleFileChange} className="w-full text-xs" /></div><div><label className="text-xs font-bold text-gray-400">YouTube 連結</label><input className="w-full border-2 p-3 rounded-xl" placeholder="https://youtu.be/..." value={form.youtube} onChange={e=>setForm({...form, youtube:e.target.value})}/></div></div>{form.image && <div className="text-center"><p className="text-xs text-green-600 font-bold">圖片已就緒</p><img src={form.image} className="h-20 mx-auto rounded-lg mt-1 border"/></div>}<div><label className="flex items-center gap-2"><input type="checkbox" checked={isMulti} onChange={e=>setIsMulti(e.target.checked)}/> 多場次？</label></div>{isMulti ? (<div className="bg-gray-50 p-4 rounded-xl space-y-2"><div className="flex gap-2"><input className="border p-2 rounded w-1/3" placeholder="名稱 (如:第一梯)" value={newSession.name} onChange={e=>setNewSession({...newSession, name:e.target.value})}/><input className="border p-2 rounded w-1/3" placeholder="時間" value={newSession.time} onChange={e=>setNewSession({...newSession, time:e.target.value})}/><input type="number" className="border p-2 rounded w-20" placeholder="人" value={newSession.limit} onChange={e=>setNewSession({...newSession, limit:e.target.value})}/><button onClick={handleAddSession} className="bg-blue-500 text-white px-3 rounded">+</button></div><ul>{form.sessions.map((s,i)=><li key={i} className="flex justify-between text-sm p-1 border-b">{s.name} - {s.time} ({s.limit}人) <button onClick={()=>removeSession(i)} className="text-red-500">刪</button></li>)}</ul><p className="text-xs text-gray-400 mt-2">* 按下創建時，上方輸入框中的資料也會自動加入</p></div>) : (<div className="grid grid-cols-2 gap-4"><div><label className="text-xs font-bold text-gray-400">開課日期</label><input className="w-full border-2 p-3 rounded-xl font-bold" placeholder="YYYY-MM-DD" value={form.courseTime} onChange={e=>setForm({...form, courseTime:e.target.value})}/></div><div><label className="text-xs font-bold text-gray-400">限額</label><input type="number" className="w-full border-2 p-3 rounded-xl font-bold" value={form.capacity} onChange={e=>setForm({...form, capacity:e.target.value})}/></div></div>)}<div className="grid grid-cols-2 gap-4"><div><label className="text-xs font-bold text-gray-400">類型</label><select className="w-full border-2 p-3 rounded-xl font-bold" value={form.type} onChange={e=>setForm({...form, type:e.target.value})}><option>講座類</option><option>教學類</option><option>聯誼類</option><option>其他</option></select></div><div><label className="text-xs font-bold text-gray-400">截止日期</label><input className="w-full border-2 p-3 rounded-xl font-bold" placeholder="YYYY-MM-DD" value={form.deadline} onChange={e=>setForm({...form, deadline:e.target.value})}/></div></div><div className="pt-2"><label className="flex items-center gap-3 p-4 border-2 rounded-2xl bg-gray-50 cursor-pointer active:scale-95 transition-all"><input type="checkbox" className="w-5 h-5 accent-green-600" checked={form.needMeal} onChange={e=>setForm({...form, needMeal:e.target.checked})}/><span className="font-bold text-gray-700">提供餐點？ (葷素調查)</span></label></div></div><div className="pt-4 flex gap-3"><button onClick={onClose} className="flex-1 py-4 border-2 rounded-2xl font-bold text-gray-400">取消</button><button onClick={handleSubmit} disabled={loading} className="flex-[2] bg-green-600 text-white py-4 rounded-2xl font-black shadow-lg uppercase">{loading ? "正在創建活動..." : "確認創建"}</button></div></div></div>); }
-        function LotteryDrawer({ isOpen, activity, onClose, onDataChange }) { const [candidates, setCandidates] = useState([]); const [winners, setWinners] = useState([]); const [drawCount, setDrawCount] = useState(1); const [prizeName, setPrizeName] = useState(""); const [drawing, setDrawing] = useState(false); useEffect(() => { if (isOpen && activity) callAPI('getLotteryParticipants', { id: activity['活動試算表ID'] }).then(res => { const all = res || []; setCandidates(all); setWinners(all.filter(p => p.prize).reverse()); }); }, [isOpen, activity]); const handleDraw = async () => { if (!prizeName) return alert("請輸入獎項名稱"); setDrawing(true); const pool = candidates.filter(p => !p.prize && p.status !== "未簽到"); if (pool.length < drawCount) { setDrawing(false); return alert("符合資格人數不足"); } const newW = []; const poolC = [...pool]; for(let i=0; i<drawCount; i++) { newW.push(poolC.splice(Math.floor(Math.random() * poolC.length), 1)[0]); } setWinners([...newW.map(w => ({ ...w, prize: prizeName })), ...winners]); setDrawing(false); await callAPI('saveLotteryResults', { id: activity['活動試算表ID'], winners: newW.map(w=>({row: w._row, prize: prizeName})) }); onDataChange(); }; if (!isOpen || !activity) return null; return (<div className="lottery-screen fade-in"><div className="w-full bg-[#fceda2] p-10 text-center shadow-md relative"><button onClick={onClose} className="absolute top-10 left-10 bg-white px-6 py-2 rounded-xl font-bold">← 返回列表</button><h2 className="text-5xl font-black text-red-600 font-mono tracking-tighter uppercase">幸運抽抽樂</h2></div><div className="w-full p-8 border-b flex flex-wrap gap-8 justify-center items-end bg-white sticky top-0 z-10 shadow-sm"><div><label className="text-xs font-bold block mb-1 text-gray-400">獎項</label><input className="border-2 p-3 rounded-xl text-2xl w-80 text-center font-bold" value={prizeName} onChange={e => setPrizeName(e.target.value)} /></div><div><label className="text-xs font-bold block mb-1 text-gray-400">人數</label><input type="number" className="border-2 p-3 rounded-xl text-2xl w-24 text-center font-bold" value={drawCount} onChange={e => setDrawCount(e.target.value)} /></div><button onClick={handleDraw} disabled={drawing} className="bg-green-600 text-white px-12 py-3 rounded-xl font-black text-2xl shadow-xl uppercase">{drawing ? "搖獎中..." : "開始抽獎"}</button><button onClick={()=>confirm("確定清除？") && callAPI('clearLotteryData',{id:activity['活動試算表ID']}).then(()=>setWinners([]))} className="bg-red-500 text-white px-6 py-3 rounded-xl font-bold uppercase tracking-tight">清除紀錄</button></div><div className="flex-1 overflow-auto p-12 bg-gray-50 flex justify-center w-full"><table className="w-[95%] max-w-7xl text-2xl text-center bg-white rounded-3xl shadow-2xl mb-20 h-fit"><thead className="bg-gray-100"><tr><th>梯次</th><th>獎項</th><th>得主</th><th>電話</th></tr></thead><tbody>{winners.length === 0 ? <tr><td colSpan="4" className="p-32 text-gray-300 italic uppercase font-black tracking-widest">No Record</td></tr> : winners.map((w, i) => (<tr key={i} className="border-b hover:bg-yellow-50"><td className="p-6 text-gray-400">{winners.length - i}</td><td className="p-6 font-bold text-blue-600 uppercase">{w.prize}</td><td className="p-6 font-black">{w.name}</td><td className="p-6 text-gray-500 font-mono tracking-tighter">{w.phone}</td></tr>))}</tbody></table></div></div>); }
-        function EditDrawer({ isOpen, onClose, item, sheetName, onSaved, cols }) { const [formData, setFormData] = useState({}); const [isSaving, setIsSaving] = useState(false); const isNew = !item; useEffect(() => { setFormData(item || {}); }, [item]); const fields = cols.map(c => c.l).filter(l => l !== "維護" && l !== "序號" && l !== "綁定狀態"); const handleSave = async () => { setIsSaving(true); const action = isNew ? 'addMember' : 'updateMemberData'; const res = await callAPI(action, { sheetName, row: formData._row, data: formData }); setIsSaving(false); if(res.success) { onSaved(); onClose(); } else { alert("失敗：" + res.message); } }; return (<div className={`drawer-root ${isOpen ? 'is-open' : ''}`}><div className="drawer-overlay" onClick={onClose}></div><div className="drawer-container p-8"><div className="flex justify-between items-center mb-6 border-b pb-4"><h3 className="text-2xl font-black tracking-tight text-gray-800 uppercase italic">{isNew ? "✨ 新增" : "✏️ 編輯"}</h3><button onClick={onClose} className="text-gray-400 text-3xl font-bold hover:text-red-500 transition-colors tracking-tight">&times;</button></div><div className="flex gap-4 mb-8 pb-6 border-b"><button onClick={onClose} className="flex-1 py-4 border-2 rounded-2xl font-bold text-gray-400">取消</button><button onClick={handleSave} disabled={isSaving} className="flex-[2] bg-blue-600 text-white py-4 rounded-2xl font-black shadow-xl uppercase">{isSaving ? "處理中..." : "確認"}</button></div><div className="space-y-4 overflow-auto flex-1 no-scrollbar pr-2">{fields.map(f => (<div key={f}><label className="text-xs font-bold text-gray-400 block mb-1 uppercase tracking-widest">{f}</label>{f.includes("備註")?<textarea className="w-full border-2 p-3 rounded-xl h-24 font-bold" value={formData[f]||""} onChange={e=>setFormData({...formData,[f]:e.target.value})}/>: f.includes("資格") ? <select className="w-full border-2 p-3 rounded-xl font-bold" value={formData[f]||""} onChange={e=>setFormData({...formData, [f]:e.target.value})}><option value="">請選擇</option><option value="Y">Y</option><option value="N">N</option></select> : <input className="w-full border-2 p-3 rounded-xl font-bold" value={formData[f]||""} onChange={e=>setFormData({...formData,[f]:e.target.value})}/>}</div>))}</div></div></div>); }
-        function DashboardView({ activityData }) { const [stats, setStats] = useState({ activityCount: 0, assocCount: 0, vendorCount: 0 }); useEffect(() => { callAPI('getDashboardSummary').then(res => res.success && setStats(res.stats)); }, []); return (<div className="p-8 fade-in"><h2 className="text-3xl font-black mb-10 tracking-widest uppercase text-gray-700">Global Monitor</h2><div className="grid grid-cols-3 gap-8 mb-16"><div className="bg-white p-8 rounded-[2.5rem] shadow-sm text-center border-2 border-green-50"><p className="text-xs text-gray-400 font-bold mb-1 uppercase">上架活動</p><h3 className="text-4xl font-black text-green-600 tracking-tighter">{stats.activityCount}</h3></div><div className="bg-white p-8 rounded-[2.5rem] shadow-sm text-center border-2 border-blue-50"><p className="text-xs text-gray-400 font-bold mb-1 uppercase">協會會員</p><h3 className="text-4xl font-black text-blue-600 tracking-tighter">{stats.assocCount}</h3></div><div className="bg-white p-8 rounded-[2.5rem] shadow-sm text-center border-2 border-purple-50"><p className="text-xs text-gray-400 font-bold mb-1 uppercase">贊助廠商</p><h3 className="text-4xl font-black text-purple-600 tracking-tighter">{stats.vendorCount}</h3></div></div><div className="bg-white rounded-[2.5rem] shadow-xl overflow-hidden border w-full mx-auto"><table className="w-full text-center text-sm"><thead className="bg-gray-50 border-b uppercase font-bold text-gray-400"><tr><th className="p-6 text-left pl-12">活動名稱</th><th>狀態</th><th>報名</th><th>核銷</th></tr></thead><tbody>{activityData.slice(0,8).map((act,idx)=>(<tr key={idx} className="border-b hover:bg-gray-50"><td className="p-6 font-bold text-left pl-12 text-xl text-gray-700">{act['活動名稱']}</td><td><span className="bg-green-100 text-green-700 px-5 py-1.5 rounded-full text-[10px] font-black uppercase border border-green-200 tracking-widest">ONLINE</span></td><td className="p-6 font-black text-blue-600 text-3xl">{act['報名人數']}</td><td className="p-6 text-gray-500 text-xl font-bold">{act['核銷人數'] || 0}</td></tr>))}</tbody></table></div></div>); }
+        // --- 入口 ---
+        function ActivityIcon() { return <IconBase><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></IconBase>; }
+        function IconPlus() { return <IconBase><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></IconBase>; }
+        function Trash2() { return <IconBase><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></IconBase>; }
 
         const App = () => (<AuthProvider><MainApp /></AuthProvider>);
         const root = window.ReactDOM.createRoot(document.getElementById('root'));
