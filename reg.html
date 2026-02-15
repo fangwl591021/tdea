@@ -3,66 +3,237 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>TDEA 系統入口</title>
+  <title>TDEA 活動管理系統 - 權限驗證</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     .fade-in { animation: fadeIn .4s ease-in-out forwards; }
     @keyframes fadeIn { from{opacity:0; transform: translateY(10px);} to{opacity:1; transform: translateY(0);} }
     .hidden { display: none !important; }
+    .btn-line { background: linear-gradient(to right, #06c755, #05b34c); }
+    .btn-line:active { background: #049f43; transform: scale(0.98); }
+    .input-field:focus { border-color: #06c755; box-shadow: 0 0 0 3px rgba(6, 199, 85, 0.2); }
   </style>
 </head>
-<body class="bg-gray-50 min-h-screen flex items-center justify-center p-4">
+<body class="bg-gray-50 min-h-screen flex items-center justify-center p-4 font-sans text-gray-700">
 
-  <!-- 🟢 驗證中 -->
-  <div id="splash" class="text-center fade-in">
-    <div class="w-16 h-16 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mx-auto mb-4"></div>
-    <h2 class="text-gray-500 font-bold">身分核對中...</h2>
+  <!-- 🟢 Loading / 驗證中畫面 (Splash) -->
+  <div id="splash" class="flex flex-col items-center justify-center w-full max-w-sm mx-auto text-center space-y-6 fade-in">
+    <div class="relative w-24 h-24 bg-white rounded-2xl shadow-lg flex items-center justify-center mb-4">
+      <i class="fa-solid fa-shield-halved text-4xl text-green-500"></i>
+    </div>
+    <div class="space-y-2">
+      <h2 class="text-xl font-bold text-gray-800">TDEA 活動管理系統</h2>
+      <div class="flex items-center justify-center space-x-2 text-green-600 text-sm font-medium">
+        <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span>權限驗證中...</span>
+      </div>
+    </div>
   </div>
 
-  <!-- ⏳ 審核中 -->
-  <div id="pendingPage" class="bg-white rounded-3xl shadow-xl p-10 w-full max-w-sm text-center hidden fade-in">
-    <div class="text-5xl mb-4">⏳</div>
-    <h2 class="text-xl font-bold text-gray-800 mb-2">管理權限審核中</h2>
-    <p class="text-gray-500 text-sm mb-6">您的資料已送出，管理員核准後即可進入「後台管理中心」。</p>
-    <button onclick="window.location.replace('lobby.html')" class="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold mb-3 shadow-lg">先去活動報名頁</button>
-    <button onclick="location.reload()" class="w-full bg-gray-100 text-gray-400 py-3 rounded-xl font-bold text-xs">已開通？重新整理</button>
+  <!-- ⏳ 審核中畫面 -->
+  <div id="pendingPage" class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm text-center hidden fade-in">
+    <div class="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
+      <i class="fa-solid fa-hourglass-half text-3xl text-yellow-600"></i>
+    </div>
+    <h2 class="text-2xl font-bold text-gray-800 mb-2">權限審核中</h2>
+    <p class="text-gray-600 mb-4">您的申請已送出，請等待管理員核准開通權限。</p>
+    
+    <div class="bg-gray-50 rounded-lg p-4 text-left text-xs text-gray-500 mb-6 border border-gray-200">
+      <p class="mb-1"><strong>申請人：</strong> <span id="pendingName">-</span></p>
+      <p class="mb-1"><strong>目前狀態：</strong> <span class="text-orange-500 font-bold">待審核</span></p>
+      <p class="text-gray-400 mt-2 text-[10px]">管理員將狀態更改為「核准」或「管理員」後，點擊下方重新整理即可進入。</p>
+    </div>
+
+    <button onclick="window.location.reload()" class="w-full bg-gray-200 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-300 transition-all">
+      <i class="fa-solid fa-rotate-right mr-2"></i>重新整理狀態
+    </button>
+  </div>
+
+  <!-- 📝 註冊表單 -->
+  <div id="registerForm" class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden hidden fade-in">
+    <div class="bg-green-500 p-6 text-center text-white relative">
+        <h1 class="text-xl font-bold tracking-wide">後台權限申請</h1>
+        <p class="text-green-100 text-sm mt-1">請填寫真實資料以供審核</p>
+        <div class="absolute -bottom-8 left-1/2 transform -translate-x-1/2">
+            <div class="w-16 h-16 rounded-full border-4 border-white bg-gray-200 overflow-hidden shadow-md">
+                <img id="userAvatar" src="https://via.placeholder.com/150" alt="Avatar" class="w-full h-full object-cover">
+            </div>
+        </div>
+    </div>
+
+    <div class="pt-12 pb-8 px-6 space-y-4">
+      <div class="text-center mb-4">
+        <p id="displayName" class="font-bold text-gray-800 text-lg">載入中...</p>
+      </div>
+
+      <div class="space-y-1">
+        <label class="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">真實姓名</label>
+        <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <i class="fa-regular fa-user text-gray-400"></i>
+            </div>
+            <input id="name" type="text" placeholder="請輸入您的真實姓名" 
+                class="input-field w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50 outline-none transition-all text-gray-700 placeholder-gray-400">
+        </div>
+      </div>
+
+      <div class="space-y-1">
+        <label class="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">手機號碼</label>
+        <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <i class="fa-solid fa-phone text-gray-400"></i>
+            </div>
+            <input id="phone" type="tel" placeholder="0912345678" maxlength="10"
+                class="input-field w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50 outline-none transition-all text-gray-700 placeholder-gray-400">
+        </div>
+      </div>
+
+      <div class="pt-4">
+        <button id="registerBtn" onclick="registerUser()" class="btn-line w-full text-white py-3.5 rounded-xl font-bold text-lg shadow-lg shadow-green-200 transition-all flex items-center justify-center space-x-2">
+            <span id="btnText">提交申請</span>
+            <div id="btnSpinner" class="hidden animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+        </button>
+      </div>
+    </div>
   </div>
 
 <script>
+/* ==========================================
+   ⚙️ 系統設定
+   ========================================== */
 const LIFF_ID  = '2005868456-cfANNVou';     
-const API_URL  = 'https://tdea.fangwl591021.workers.dev/'; 
+const GAS_URL  = 'https://script.google.com/macros/s/AKfycbxPAErsPls4incGRMGbjGcS9PAYT7FKrs4nKOkxcSNtoeGpR4UTxSoHC03os8cD4L1c/exec'; 
+const NEXT_PAGE = 'main.html';
 
 const $ = id => document.getElementById(id);
-function showPage(pageId) { $('splash').classList.add('hidden'); $('pendingPage').classList.add('hidden'); $(pageId).classList.remove('hidden'); }
 
+function showPage(pageId) {
+    ['splash', 'registerForm', 'pendingPage'].forEach(id => $(id).classList.add('hidden'));
+    $(pageId).classList.remove('hidden');
+}
+
+let currentUserId = null;
+
+/* ==========================================
+   🚀 初始化流程
+   ========================================== */
 window.onload = async function() {
     try {
         await liff.init({ liffId: LIFF_ID });
-        if (!liff.isLoggedIn()) { liff.login(); return; }
-        const profile = await liff.getProfile();
         
-        const response = await fetch(API_URL, {
+        if (!liff.isLoggedIn()) {
+            liff.login();
+            return;
+        }
+
+        const profile = await liff.getProfile();
+        currentUserId = profile.userId;
+        
+        // 預填介面資訊
+        $('displayName').textContent = profile.displayName;
+        if (profile.pictureUrl) $('userAvatar').src = profile.pictureUrl;
+        $('name').value = profile.displayName;
+
+        // 執行權限檢查
+        await checkPermission(currentUserId);
+
+    } catch (err) {
+        console.error('LIFF Init Error:', err);
+        alert('系統初始化錯誤：' + err.message);
+    }
+};
+
+/**
+ * 核心權限檢查函式 (含防快取機制)
+ */
+async function checkPermission(userId) {
+    try {
+        // 🌟 加入時間戳記避免 fetch 抓到舊的快取結果
+        const nocacheUrl = GAS_URL + '?t=' + new Date().getTime();
+        
+        const response = await fetch(nocacheUrl, {
             method: 'POST',
-            body: JSON.stringify({ action: 'check', userId: profile.userId })
+            mode: 'cors',
+            body: JSON.stringify({ action: 'check', userId: userId })
         });
         const result = await response.json();
-        
-        // 🌟 核心分流邏輯
-        if (result.status === 'admin') {
-            window.location.replace('index.html'); // 只有管理員進後台
+
+        console.log("權限驗證回傳：", result);
+
+        if (result.status === 'ok') {
+            // ✅ 通過：跳轉至管理主頁
+            window.location.replace(NEXT_PAGE);
         } 
-        else if (result.status === 'member') {
-            window.location.replace('lobby.html'); // 一般會員直接去報名大廳
-        }
         else if (result.status === 'pending') {
-            showPage('pendingPage'); // 審核中顯示提示，但可跳轉報名頁
-        }
+            // ⏳ 待審核：顯示等待頁面
+            $('pendingName').textContent = result.name || "申請人";
+            showPage('pendingPage');
+        } 
         else {
-            window.location.replace('login.html'); // 未註冊去綁定頁
+            // 📝 新使用者：顯示註冊表單
+            showPage('registerForm');
         }
-    } catch (err) { alert('連線異常'); }
-};
+    } catch (err) {
+        console.error('Check Failed:', err);
+        // 若發生連線錯誤，保守起見顯示表單
+        showPage('registerForm');
+    }
+}
+
+/**
+ * 提交註冊申請
+ */
+async function registerUser() {
+    const name = $('name').value.trim();
+    const phone = $('phone').value.trim();
+
+    if (!name || !phone) { alert('請填寫完整姓名與電話'); return; }
+    if (!/^09\d{8}$/.test(phone)) { alert('請輸入正確的手機號碼格式'); return; }
+
+    const btn = $('registerBtn');
+    btn.disabled = true;
+    $('btnText').classList.add('hidden');
+    $('btnSpinner').classList.remove('hidden');
+
+    try {
+        const response = await fetch(GAS_URL, {
+            method: 'POST',
+            mode: 'cors',
+            body: JSON.stringify({
+                action: 'register',
+                userId: currentUserId,
+                name: name,
+                phone: phone
+            })
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('✅ 申請已送出！請聯繫管理員核准權限。');
+            $('pendingName').textContent = name;
+            showPage('pendingPage');
+        } else {
+            alert('註冊失敗：' + result.message);
+            resetBtn();
+        }
+    } catch (err) {
+        alert('連線失敗，請檢查 GAS 部署權限是否正確。');
+        resetBtn();
+    }
+}
+
+function resetBtn() {
+    const btn = $('registerBtn');
+    btn.disabled = false;
+    $('btnText').classList.remove('hidden');
+    $('btnSpinner').classList.add('hidden');
+}
 </script>
 </body>
 </html>
