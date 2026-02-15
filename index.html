@@ -12,27 +12,41 @@
     <style>
         :root { --line-green: #06C755; --bg-gray: #F4F5F7; --border: #E6E6E6; }
         body { background-color: var(--bg-gray); color: #111; font-family: -apple-system, "Noto Sans TC", sans-serif; margin: 0; }
+        
+        /* 側邊欄 */
         .sidebar { background: #FFFFFF; width: 240px; border-right: 1px solid var(--border); position: fixed; top: 0; bottom: 0; left: 0; z-index: 50; }
         .logo-area { height: 60px; display: flex; align-items: center; padding: 0 24px; border-bottom: 1px solid var(--border); font-weight: 900; font-size: 18px; color: var(--line-green); }
         .nav-item { padding: 14px 24px; cursor: pointer; color: #555; display: flex; align-items: center; gap: 12px; transition: 0.2s; border-left: 4px solid transparent; }
         .nav-item:hover { background: #F9F9F9; color: var(--line-green); }
         .nav-item.active { background: #F0FAF4; color: var(--line-green); border-left-color: var(--line-green); font-weight: 600; }
+        .nav-header { padding: 18px 24px 6px; font-size: 11px; color: #BBB; font-weight: bold; text-transform: uppercase; }
+
+        /* 主內容區 */
         .main-content { margin-left: 240px; padding: 40px 60px; min-height: 100vh; width: calc(100% - 240px); box-sizing: border-box; }
         .page-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 15px; }
+        .page-title { font-size: 26px; font-weight: 800; color: #111; }
+
+        /* 橫式三方塊 */
         .stat-grid { display: flex; gap: 20px; margin-bottom: 35px; }
         .stat-box { flex: 1; background: white; border: 1px solid var(--border); padding: 25px; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; }
         .stat-value { font-size: 32px; font-weight: 900; }
+
+        /* 表格撐滿去框 */
         .table-wrapper { width: 100%; overflow-x: auto; background: white; border: 1px solid var(--border); border-radius: 4px; }
         table { width: 100%; border-collapse: collapse; }
         th { text-align: center; padding: 15px; border-bottom: 1px solid var(--border); color: #888; font-size: 12px; font-weight: 700; background: #FAFAFA; }
         td { padding: 18px 15px; border-bottom: 1px solid #F0F0F0; font-size: 14.5px; color: #333; text-align: center; }
-        .btn { padding: 7px 18px; border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; gap: 8px; }
+        tr:hover td { background: #FAFAFA; }
+
+        .btn { padding: 7px 18px; border-radius: 4px; font-size: 13px; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; gap: 8px; font-weight: 600; white-space: nowrap; }
         .btn-primary { background: var(--line-green); color: white; border: 1px solid var(--line-green); }
         .btn-outline { background: white; color: #555; border: 1px solid #CCC; }
         .btn-danger { color: #FF4D4F; border: 1px solid #FFCDCD; }
+        
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 2000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
         .drawer { position: fixed; right: 0; top: 0; bottom: 0; width: 480px; background: white; z-index: 1001; transform: translateX(100%); transition: 0.3s; box-shadow: -4px 0 15px rgba(0,0,0,0.1); border-left: 1px solid var(--border); }
         .drawer.open { transform: translateX(0); }
+        .lottery-screen { position: fixed; inset: 0; background: white; z-index: 3000; overflow: auto; display: flex; flex-direction: column; }
         .fade-in { animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
     </style>
@@ -52,6 +66,7 @@
                 users: <Fragment><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><circle cx="17" cy="11" r="4"/></Fragment>,
                 plus: <Fragment><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></Fragment>,
                 link: <Fragment><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></Fragment>,
+                award: <Fragment><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></Fragment>,
                 search: <Fragment><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></Fragment>
             };
             return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{display:'inline-block'}}>{icons[name] || <circle cx="12" cy="12" r="10" />}</svg>;
@@ -80,11 +95,11 @@
                 };
                 init();
             }, []);
-            if (auth.status === "LOADING") return <div className="h-screen flex items-center justify-center text-xs text-gray-400 font-bold uppercase tracking-widest">Connect...</div>;
+            if (auth.status === "LOADING") return <div className="h-screen flex items-center justify-center text-xs text-gray-400 font-bold tracking-widest uppercase">System Syncing...</div>;
             return <AuthContext.Provider value={auth}>{children}</AuthContext.Provider>;
         }
 
-        // --- 🌟 組件: 會員報名大廳 ---
+        // --- 報名大廳 ---
         function MemberLobby({ activities }) {
             return (
                 <div className="max-w-2xl mx-auto p-8 fade-in">
@@ -93,7 +108,7 @@
                         {activities.filter(a=>a.狀態==='上架').map((act, i) => (
                             <div key={i} className="bg-white p-6 rounded-2xl border shadow-sm flex justify-between items-center">
                                 <div><h3 className="font-bold text-xl text-gray-800">{act['活動名稱']}</h3><p className="text-sm text-gray-400 mt-1">📅 {act['課程時間']}</p></div>
-                                <a href={act['報名前端網址']} target="_blank" className="btn btn-primary px-8 py-3 rounded-full shadow-lg shadow-green-100">立即報名</a>
+                                <a href={act['報名前端網址']} target="_blank" className="btn btn-primary px-8 py-3 rounded-full shadow-lg">報名</a>
                             </div>
                         ))}
                     </div>
@@ -101,10 +116,13 @@
             );
         }
 
-        // --- 🌟 組件: 管理後台 ---
+        // --- 管理後台 ---
         function AdminConsole({ activityData, refresh }) {
-            const [view, setView] = useState('dashboard'), [selectedAct, setSelectedAct] = useState(null);
+            const [view, setView] = useState('dashboard'), [selectedAct, setSelectedAct] = useState(null), [lotTarget, setLotTarget] = useState(null);
+            
+            if (lotTarget) return <LotteryDrawer isOpen={!!lotTarget} activity={lotTarget} onClose={()=>setLotTarget(null)} onDataChange={refresh} />;
             if (selectedAct) return <DetailPage activity={selectedAct} onBack={()=>setSelectedAct(null)} onRefresh={refresh} />;
+
             return (
                 <div className="flex">
                     <div className="sidebar shadow-sm">
@@ -113,43 +131,21 @@
                             <div className={`nav-item ${view==='dashboard'?'active':''}`} onClick={()=>setView('dashboard')}><Icon name="dashboard"/> 系統總覽</div>
                             <div className={`nav-item ${view==='activity'?'active':''}`} onClick={()=>setView('activity')}><Icon name="activity"/> 活動管理</div>
                             <div className="nav-header">Database</div>
-                            {['assoc', 'vendor', 'guest'].map(v => (
-                                <div key={v} className={`nav-item ${view===v?'active':''}`} onClick={()=>setView(v)}><Icon name="users"/> {v==='assoc'?'協會會員':(v==='vendor'?'廠商單位':'一般人員')}</div>
-                            ))}
+                            <div className={`nav-item ${view==='assoc'?'active':''}`} onClick={()=>setView('assoc')}><Icon name="users"/> 協會會員</div>
+                            <div className={`nav-item ${view==='vendor'?'active':''}`} onClick={()=>setView('vendor')}><Icon name="users"/> 廠商單位</div>
+                            <div className={`nav-item ${view==='guest'?'active':''}`} onClick={()=>setView('guest')}><Icon name="users"/> 一般人員</div>
                         </nav>
                     </div>
                     <div className="main-content">
                         {view === 'dashboard' && <DashboardView activityData={activityData} />}
-                        {view === 'activity' && <ActivityManagement activityData={activityData} refresh={refresh} setSelectedDetail={setSelectedAct} />}
-                        {['assoc', 'vendor', 'guest'].includes(view) && <MemberTable sheetName={view==='assoc'?'本業會員':(view==='vendor'?'廠商會員':'一般會員')} title={view==='assoc'?'協會會員管理':(view==='vendor'?'廠商名冊':'一般名冊')} />}
+                        {view === 'activity' && <ActivityManagement activityData={activityData} refresh={refresh} setSelectedDetail={setSelectedAct} setLotTarget={setLotTarget} />}
+                        {['assoc', 'vendor', 'guest'].includes(view) && <MemberTable sheetName={view==='assoc'?'本業會員':(view==='vendor'?'廠商會員':'一般會員')} title={view==='assoc'?'協會會員管理':(view==='vendor'?'廠商名冊':'一般註冊名冊')} />}
                     </div>
                 </div>
             );
         }
 
-        function DashboardView({ activityData }) {
-            const [stats, setStats] = useState({ activityCount: 0, assocCount: 0, vendorCount: 0 });
-            useEffect(() => { callAPI('getDashboardSummary').then(res => res.success && setStats(res.stats)); }, []);
-            return (
-                <div className="fade-in">
-                    <div className="page-header"><h1 className="page-title">數據概況</h1></div>
-                    <div className="stat-grid">
-                        <div className="stat-box"><div className="stat-info"><span className="text-gray-400 text-xs font-bold uppercase">進行中活動</span><div className="stat-value text-emerald-500">{stats.activityCount}</div></div><Icon name="activity" size={24}/></div>
-                        <div className="stat-box"><div className="stat-info"><span className="text-gray-400 text-xs font-bold uppercase">協會會員</span><div className="stat-value text-blue-500">{stats.assocCount}</div></div><Icon name="users" size={24}/></div>
-                        <div className="stat-box"><div className="stat-info"><span className="text-gray-400 text-xs font-bold uppercase">廠商與一般</span><div className="stat-value text-purple-500">{stats.vendorCount}</div></div><Icon name="users" size={24}/></div>
-                    </div>
-                    <h3 className="font-bold text-gray-700 mb-4 text-lg">活動監控</h3>
-                    <div className="table-wrapper">
-                        <table>
-                            <thead><tr><th className="text-left pl-8">名稱</th><th>類型</th><th>報名</th><th>狀態</th></tr></thead>
-                            <tbody>{activityData.slice(0, 8).map((act, i) => (<tr key={i}><td className="text-left pl-8 font-bold">{act['活動名稱']}</td><td>{act['活動類型']}</td><td className="font-bold text-blue-600">{act['報名人數']}</td><td><span className="text-emerald-500 font-bold text-[10px]">● RUNNING</span></td></tr>))}</tbody>
-                        </table>
-                    </div>
-                </div>
-            );
-        }
-
-        function ActivityManagement({ activityData, refresh, setSelectedDetail }) {
+        function ActivityManagement({ activityData, refresh, setSelectedDetail, setLotTarget }) {
             return (
                 <div className="fade-in">
                     <div className="page-header"><h1 className="page-title">活動管理中心</h1><button className="btn btn-primary" onClick={()=>{}}><Icon name="plus"/> 建立活動</button></div>
@@ -161,10 +157,11 @@
                                     <td className="text-left pl-8"><div className="font-bold text-gray-800 text-lg">{act['活動名稱']}</div><div className="text-xs text-gray-400">📅 {act['課程時間']}</div></td>
                                     <td className="font-bold text-blue-600 text-xl">{act['報名人數']}</td>
                                     <td className="text-gray-400 font-bold">{act['核銷人數']}</td>
-                                    <td><span className="bg-emerald-50 text-emerald-600 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-100">{act.狀態}</span></td>
+                                    <td><span className="bg-emerald-50 text-emerald-600 text-[10px] font-bold px-2 py-0.5 rounded">{act.狀態}</span></td>
                                     <td className="text-right pr-8 space-x-1.5 whitespace-nowrap">
                                         <a href={act['報名前端網址']} target="_blank" className="btn btn-outline" title="連結"><Icon name="link" size={14}/></a>
                                         <button className="btn btn-outline" onClick={()=>setSelectedDetail(act)}>明細</button>
+                                        <button className="btn btn-outline" onClick={()=>setLotTarget(act)}><Icon name="award" size={14}/> 抽獎</button>
                                         <button className="btn btn-danger" onClick={()=>{}}>下架</button>
                                     </td>
                                 </tr>
@@ -175,7 +172,39 @@
             );
         }
 
-        // --- 🌟 組件: 名冊管理 (補回編輯、刪除確認、去框) ---
+        // --- 🌟 抽獎功能補回 ---
+        function LotteryDrawer({ isOpen, activity, onClose, onDataChange }) {
+            const [winners, setWinners] = useState([]), [drawCount, setDrawCount] = useState(1), [prize, setPrize] = useState(""), [drawing, setDrawing] = useState(false);
+            useEffect(() => { if (isOpen && activity) callAPI('getLotteryParticipants', { id: activity['活動試算表ID'] }).then(res => setWinners((res||[]).filter(p=>p.prize).reverse())); }, [isOpen, activity]);
+            const handleDraw = async () => {
+                if(!prize) return alert("請填獎項");
+                setDrawing(true);
+                const res = await callAPI('getLotteryParticipants', { id: activity['活動試算表ID'] });
+                const pool = (res||[]).filter(p=>!p.prize && p.status!=="未簽到");
+                if(pool.length < drawCount) { setDrawing(false); return alert("剩餘合格人數不足"); }
+                const lucky = []; const copy = [...pool]; for(let i=0; i<drawCount; i++) lucky.push(copy.splice(Math.floor(Math.random()*copy.length), 1)[0]);
+                setWinners([...lucky.map(w=>({...w, prize})), ...winners]); setDrawing(false);
+                await callAPI('saveLotteryResults', { id: activity['活動試算表ID'], winners: lucky.map(w=>({row: w._row, prize})) }); onDataChange();
+            };
+            if (!isOpen) return null;
+            return (
+                <div className="lottery-screen fade-in">
+                    <div className="bg-[#fceda2] p-10 text-center relative border-b-2 border-yellow-200">
+                        <button onClick={onClose} className="absolute left-8 top-10 btn btn-outline font-bold">← 返回</button>
+                        <h1 className="text-4xl font-black text-red-600 uppercase italic">Lucky Draw</h1>
+                        <p className="text-gray-600 font-bold mt-2 uppercase">{activity['活動名稱']}</p>
+                    </div>
+                    <div className="p-8 bg-white shadow-sm flex justify-center gap-6 items-end sticky top-0 z-50">
+                        <div><label className="text-[10px] font-bold block mb-1">獎項名稱</label><input className="border-2 p-2 rounded-md font-bold text-center w-64 focus:border-red-500 outline-none" value={prize} onChange={e=>setPrize(e.target.value)}/></div>
+                        <div><label className="text-[10px] font-bold block mb-1">名額</label><input type="number" className="border-2 p-2 rounded-md font-bold text-center w-20" value={drawCount} onChange={e=>setDrawCount(e.target.value)}/></div>
+                        <button onClick={handleDraw} disabled={drawing} className="bg-red-500 text-white px-12 py-3 rounded-md font-bold shadow-lg">{drawing?"搖獎中...":"開始抽獎"}</button>
+                    </div>
+                    <div className="p-10 w-full max-w-6xl mx-auto"><div className="table-wrapper"><table><thead><tr><th>#</th><th>獎項</th><th>得主姓名</th><th>手機號碼</th></tr></thead><tbody>{winners.map((w,i)=>(<tr key={i} className="hover:bg-yellow-50"><td>{winners.length-i}</td><td className="font-bold text-blue-600 uppercase">{w.prize}</td><td className="font-black text-xl">{w.name}</td><td className="text-gray-400 font-mono">{w.phone}</td></tr>))}</tbody></table></div></div>
+                </div>
+            );
+        }
+
+        // --- 名冊維護與編輯抽屜 ---
         function MemberTable({ title, sheetName }) {
             const [data, setData] = useState([]), [loading, setLoading] = useState(true), [search, setSearch] = useState("");
             const [editing, setEditing] = useState(null), [confirmTarget, setConfirmTarget] = useState(null);
@@ -183,10 +212,8 @@
             useEffect(() => fetchData(), [sheetName]);
             const fd = data.filter(d => Object.values(d).some(v => String(v).includes(search)));
             const cols = useMemo(() => {
-                const tail = [{k:["活動報名次數"], l:"活動"}, {k:["講座類"], l:"講座"}, {k:["教學類"], l:"教學"}, {k:["聯誼類"], l:"聯誼"}, {k:["會議類"], l:"會議"}, {k:["備註"], l:"備註", mw:"150px"}, {k:["資格"], l:"資格"}, {k:["userid"], l:"UserID"}, {k:["是否綁定"], l:"狀態"}, {k:["行動電話"], l:"手機"}];
-                return sheetName.includes("廠商") ? 
-                    [{k:["序號"], l:"序"}, {k:["會員編號"], l:"編號"}, {k:["公司名稱"], l:"公司"}, {k:["公司統編"], l:"統編"}, {k:["公司負責人"], l:"負責人"}, {k:["姓名"], l:"姓名"}, {k:["會員資格(Y/N)"], l:"資格"}, ...tail] :
-                    [{k:["序號"], l:"序"}, {k:["會員編號"], l:"編號"}, {k:["身分"], l:"身分"}, {k:["姓名"], l:"姓名"}, {k:["性別"], l:"性別"}, {k:["會員資格(Y/N)"], l:"資格"}, ...tail];
+                const tail = [{k:["活動報名次數"], l:"活動"}, {k:["講座類"], l:"講座"}, {k:["教學類"], l:"教學"}, {k:["聯誼類"], l:"聯誼"}, {k:["會議類"], l:"會議"}, {k:["備註"], l:"備註", mw:"150px"}, {k:["資格"], l:"身分"}, {k:["userid"], l:"UserID"}, {k:["是否綁定"], l:"狀態"}, {k:["行動電話"], l:"手機"}];
+                return sheetName.includes("廠商") ? [{k:["序號"], l:"序"}, {k:["會員編號"], l:"編號"}, {k:["公司名稱"], l:"公司"}, {k:["姓名"], l:"姓名"}, {k:["會員資格(Y/N)"], l:"資格"}, ...tail] : [{k:["序號"], l:"序"}, {k:["會員編號"], l:"編號"}, {k:["身分"], l:"身分"}, {k:["姓名"], l:"姓名"}, {k:["會員資格(Y/N)"], l:"資格"}, ...tail];
             }, [sheetName]);
             const gv = (item, keys) => { const k = Object.keys(item).find(key => keys.some(s => key.trim().toLowerCase() === s.replace(/\s+/g,"").toLowerCase())); return k ? item[k] : ""; };
             const handleSoftDel = async () => { await callAPI('deleteMember', { sheetName, row: confirmTarget._row }); fetchData(); setConfirmTarget(null); };
@@ -195,29 +222,12 @@
                 <div className="fade-in">
                     {confirmTarget && <div className="modal-overlay"><div className="bg-white p-10 rounded-2xl shadow-2xl text-center"><h3 className="text-xl font-bold">移除成員？</h3><p className="mt-2 text-gray-500">將標記為「已移除」並隱藏。</p><div className="flex gap-2 mt-8"><button onClick={()=>setConfirmTarget(null)} className="btn btn-outline flex-1">取消</button><button onClick={handleSoftDel} className="btn btn-primary flex-1 bg-red-500 border-red-500">確認移除</button></div></div></div>}
                     <EditDrawer isOpen={!!editing} item={editing} sheetName={sheetName} onClose={()=>setEditing(null)} onSaved={fetchData} cols={cols} />
-                    <div className="page-header">
-                        <h1 className="page-title">{title}</h1>
-                        <div className="flex gap-2">
-                            <div className="relative"><input placeholder="搜尋..." className="pl-10 pr-4 py-2 border rounded text-sm w-72 outline-none focus:border-[#06C755]" value={search} onChange={e=>setSearch(e.target.value)}/><div className="absolute left-3 top-2.5 text-gray-300"><Icon name="search" size={14}/></div></div>
-                            <button className="btn btn-outline" onClick={fetchData}>刷新</button>
-                        </div>
-                    </div>
-                    <div className="table-wrapper no-scrollbar">
-                        <table>
-                            <thead><tr>{cols.map((c,i)=><th key={i} style={c.mw?{minWidth:c.mw}:{}}>{c.l}</th>)}<th>維護</th></tr></thead>
-                            <tbody>{loading ? <tr><td colSpan={40} className="p-20 text-gray-400 font-bold italic">Loading...</td></tr> : fd.map((item, idx) => (
-                                <tr key={idx}>
-                                    {cols.map((c,ci)=><td key={ci} className={c.l==='狀態'&&gv(item,c.k).includes('完成')?'text-emerald-500 font-black':''}>{gv(item, c.k)}</td>)}
-                                    <td className="whitespace-nowrap space-x-3"><button className="text-blue-500 font-bold text-xs" onClick={()=>setEditing(item)}>編輯</button><button className="text-red-400 font-bold text-xs" onClick={()=>setConfirmTarget(item)}>移除</button></td>
-                                </tr>
-                            ))}</tbody>
-                        </table>
-                    </div>
+                    <div className="page-header"><h1 className="page-title">{title}</h1><div className="flex gap-2"><div className="relative"><input placeholder="搜尋..." className="pl-10 pr-4 py-2 border rounded text-sm w-72 focus:border-[#06C755] outline-none" value={search} onChange={e=>setSearch(e.target.value)}/><div className="absolute left-3 top-2.5 text-gray-300"><Icon name="search" size={14}/></div></div><button className="btn btn-outline" onClick={fetchData}>刷新</button></div></div>
+                    <div className="table-wrapper"><table><thead><tr>{cols.map((c,i)=><th key={i} style={c.mw?{minWidth:c.mw}:{}}>{c.l}</th>)}<th>維護</th></tr></thead><tbody>{loading ? <tr><td colSpan={40} className="p-20 italic">Loading...</td></tr> : fd.map((item, idx) => (<tr key={idx}>{cols.map((c,ci)=><td key={ci} className={c.l==='狀態'&&gv(item,c.k).includes('完成')?'text-emerald-500 font-black':''}>{gv(item, c.k)}</td>)}<td className="whitespace-nowrap space-x-3"><button className="text-blue-500 font-bold text-xs" onClick={()=>setEditing(item)}>編輯</button><button className="text-red-400 font-bold text-xs" onClick={()=>setConfirmTarget(item)}>移除</button></td></tr>))}</tbody></table></div>
                 </div>
             );
         }
 
-        // --- 🌟 組件: 編輯抽屜 ---
         function EditDrawer({ isOpen, onClose, item, sheetName, onSaved, cols }) {
             const [formData, setFormData] = useState({}); const [isSaving, setIsSaving] = useState(false);
             useEffect(() => { setFormData(item || {}); }, [item]);
@@ -226,31 +236,14 @@
             return (
                 <Fragment>
                     <div className={`modal-overlay ${isOpen?'visible':'invisible'}`} onClick={onClose} style={{background:'rgba(0,0,0,0.1)', zIndex:1000}}></div>
-                    <div className={`drawer ${isOpen?'open':''}`}>
-                        <div className="p-6 border-b flex justify-between items-center bg-gray-50"><h3 className="font-bold text-lg">編輯成員資料</h3><button onClick={onClose} className="text-2xl text-gray-300">&times;</button></div>
-                        <div className="p-6 overflow-y-auto flex-1 space-y-4 no-scrollbar">
-                            {fields.map((f, i) => (<div key={i}><label className="text-[10px] font-bold text-gray-400 block mb-1 uppercase">{f.l}</label><input className="w-full border p-2.5 rounded text-sm bg-gray-50 outline-none focus:border-[#06C755]" value={formData[f.k[0]]||""} onChange={e=>setFormData({...formData,[f.k[0]]:e.target.value})}/></div>))}
-                        </div>
-                        <div className="p-6 border-t flex gap-3"><button onClick={onClose} className="btn btn-outline flex-1 justify-center">取消</button><button onClick={handleSave} disabled={isSaving} className="btn btn-primary flex-1 justify-center shadow-md">{isSaving?"儲存中...":"確認儲存"}</button></div>
-                    </div>
+                    <div className={`drawer ${isOpen?'open':''}`}><div className="p-6 border-b flex justify-between bg-gray-50"><h3 className="font-bold">編輯成員資料</h3><button onClick={onClose} className="text-2xl text-gray-300">&times;</button></div><div className="p-6 overflow-y-auto flex-1 space-y-4">{fields.map((f, i) => (<div key={i}><label className="text-[10px] font-bold text-gray-400 block mb-1 uppercase">{f.l}</label><input className="w-full border p-2.5 rounded text-sm focus:border-[#06C755] outline-none" value={formData[f.k[0]]||""} onChange={e=>setFormData({...formData,[f.k[0]]:e.target.value})}/></div>))}</div><div className="p-6 border-t flex gap-3"><button onClick={onClose} className="btn btn-outline flex-1">取消</button><button onClick={handleSave} disabled={isSaving} className="btn btn-primary flex-1">{isSaving?"儲存中...":"確認儲存"}</button></div></div>
                 </Fragment>
             );
         }
 
-        // --- 🌟 組件: 報名明細 (補回搜尋) ---
-        function DetailPage({ activity, onBack, onRefresh }) {
-            const [data, setData] = useState([]), [loading, setLoading] = useState(true), [search, setSearch] = useState("");
-            const fetchList = () => { setLoading(true); callAPI('getActivityDetails', { id: activity['活動試算表ID'] }).then(res => { setData(res || []); setLoading(false); }); };
-            useEffect(() => { if(activity) fetchList(); }, [activity]);
-            const fd = data.filter(r => String(r.姓名).includes(search) || String(r.電話).includes(search));
-            const handleToggle = async (row, status) => { const res = await callAPI('toggleCheckInStatus', { id: activity['活動試算表ID'], row, status }); if(res.success) fetchList(); onRefresh(); };
-            return (
-                <div className="fade-in">
-                    <div className="page-header"><div className="flex gap-4 items-center"><button onClick={onBack} className="btn btn-outline">←</button><h2 className="font-black text-xl">{activity['活動名稱']} - 報名名單</h2></div><div className="relative"><input placeholder="搜尋名單..." className="pl-10 pr-4 py-2 border rounded-md text-sm w-72 outline-none focus:border-[#06C755]" value={search} onChange={e=>setSearch(e.target.value)}/><div className="absolute left-3 top-2.5 text-gray-300"><Icon name="search" size={14}/></div></div></div>
-                    <div className="table-wrapper"><table><thead><tr><th>姓名</th><th>手機</th><th>狀態</th><th>核銷</th></tr></thead><tbody>{fd.map((r, i) => (<tr key={i}><td>{r.姓名}</td><td>{r.電話}</td><td><span className={`tag ${r.核銷狀態==='未簽到'?'tag-gray':'tag-green'}`}>{r.核銷狀態}</span></td><td><button onClick={() => handleToggle(r._row, r.核銷狀態)} className={`btn btn-primary btn-sm rounded-lg ${r.核銷狀態!=="未簽到"?'opacity-40':''}`}>{r.核銷狀態==="未簽到"?"簽到":"取消"}</button></td></tr>))}</tbody></table></div>
-                </div>
-            );
-        }
+        // --- 儀表板與明細略 (參考之前 v34 穩定邏輯) ---
+        function DashboardView({ activityData }) { const [stats, setStats] = useState({ activityCount: 0, assocCount: 0, vendorCount: 0 }); useEffect(() => { callAPI('getDashboardSummary').then(res => res.success && setStats(res.stats)); }, []); return (<div className="fade-in"><div className="page-header"><h1 className="page-title">數據概況</h1></div><div className="stat-grid"><div className="stat-box"><div className="stat-info"><span className="text-gray-400 text-xs font-bold uppercase">正在進行活動</span><div className="stat-value text-emerald-500">{stats.activityCount}</div></div><Icon name="activity" size={24}/></div><div className="stat-box"><div className="stat-info"><span className="text-gray-400 text-xs font-bold uppercase">協會會員</span><div className="stat-value text-blue-500">{stats.assocCount}</div></div><Icon name="users" size={24}/></div><div className="stat-box"><div className="stat-info"><span className="text-gray-400 text-xs font-bold uppercase">廠商與一般人員</span><div className="stat-value text-purple-500">{stats.vendorCount}</div></div><Icon name="users" size={24}/></div></div><div className="table-wrapper"><table><thead><tr><th className="text-left pl-8">最新活動</th><th>報名</th><th>狀態</th></tr></thead><tbody>{activityData.slice(0,5).map((a,i)=>(<tr key={i}><td className="text-left pl-8 font-bold">{a['活動名稱']}</td><td>{a['報名人數']}</td><td><span className="text-emerald-500 font-bold text-[10px]">● RUNNING</span></td></tr>))}</tbody></table></div></div>); }
+        function DetailPage({ activity, onBack, onRefresh }) { const [data, setData] = useState([]), [loading, setLoading] = useState(true), [search, setSearch] = useState(""); const fetchList = () => { setLoading(true); callAPI('getActivityDetails', { id: activity['活動試算表ID'] }).then(res => { setData(res || []); setLoading(false); }); }; useEffect(() => { if(activity) fetchList(); }, [activity]); const fd = data.filter(r => String(r.姓名).includes(search) || String(r.電話).includes(search)); const handleToggle = async (row, status) => { const res = await callAPI('toggleCheckInStatus', { id: activity['活動試算表ID'], row, status }); if(res.success) fetchList(); onRefresh(); }; return (<div className="fade-in"><div className="page-header"><div className="flex gap-4 items-center"><button onClick={onBack} className="btn btn-outline">←</button><h2 className="font-black text-xl">{activity['活動名稱']}</h2></div><div className="relative"><input placeholder="搜尋姓名/手機..." className="pl-10 pr-4 py-2 border rounded text-sm w-72 outline-none focus:border-[#06C755]" value={search} onChange={e=>setSearch(e.target.value)}/><div className="absolute left-3 top-2.5 text-gray-300"><Icon name="search" size={14}/></div></div></div><div className="table-wrapper"><table><thead><tr><th>姓名</th><th>手機</th><th>狀態</th><th>核銷</th></tr></thead><tbody>{fd.map((r, i) => (<tr key={i}><td>{r.姓名}</td><td>{r.電話}</td><td><span className={`px-2 py-0.5 rounded text-[11px] font-bold ${r.核銷狀態==='未簽到'?'bg-gray-100 text-gray-500':'bg-green-50 text-green-600 border border-green-100'}`}>{r.核銷狀態}</span></td><td><button onClick={() => handleToggle(r._row, r.核銷狀態)} className={`btn btn-primary btn-sm rounded-lg ${r.核銷狀態!=="未簽到"?'opacity-40':''}`}>{r.核銷狀態==="未簽到"?"簽到":"取消"}</button></td></tr>))}</tbody></table></div></div>); }
 
         const MainApp = () => {
             const { role } = useContext(AuthContext);
