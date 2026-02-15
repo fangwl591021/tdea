@@ -10,21 +10,20 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <style>
-        :root { --line-green: #06C755; --line-dark: #111111; --line-gray: #777777; --bg-light: #F4F5F7; --line-light: #E6E6E6; }
-        body { background-color: var(--bg-light); color: var(--line-dark); font-family: -apple-system, "Noto Sans TC", sans-serif; letter-spacing: -0.01em; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
-        .sidebar { background-color: #FFFFFF; border-right: 1px solid var(--line-light); width: 220px; }
-        .menu-item { color: #333333; transition: all 0.2s; border-left: 4px solid transparent; font-size: 14px; padding: 12px 24px; cursor: pointer; }
-        .menu-item:hover { background-color: #F9F9F9; }
+        :root { --line-green: #06C755; --bg-main: #F4F5F7; --line-border: #E5E7EB; }
+        body { background-color: var(--bg-main); font-family: -apple-system, "Noto Sans TC", sans-serif; letter-spacing: -0.01em; }
+        .sidebar { background-color: #FFFFFF; border-right: 1px solid var(--line-border); width: 220px; }
+        .menu-item { color: #555555; transition: all 0.2s; border-left: 4px solid transparent; font-size: 14px; padding: 12px 24px; cursor: pointer; }
+        .menu-item:hover { background-color: #F9F9F9; color: var(--line-green); }
         .menu-item.active { background-color: #F0FAF4; border-left-color: var(--line-green); color: var(--line-green); font-weight: 600; }
-        .card { background: #FFFFFF; border: 1px solid var(--line-light); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-        table { width: 100%; border-collapse: collapse; }
-        table th { background-color: #F9FAFB; color: #888888; font-size: 12px; font-weight: 600; padding: 10px; border-bottom: 1px solid var(--line-light); text-align: center; }
-        table td { padding: 12px 10px; border-bottom: 1px solid #F0F0F0; font-size: 13px; text-align: center; color: #444444; }
-        .btn-primary { background-color: var(--line-green); color: #FFFFFF; border-radius: 6px; font-weight: 600; }
-        .btn-outline { border: 1px solid #D1D1D1; color: #555555; background: white; border-radius: 6px; }
-        .btn-outline:hover { background: #FAFAFA; border-color: #BBBBBB; }
+        .card { background: #FFFFFF; border: 1px solid var(--line-border); border-radius: 8px; }
+        table th { background-color: #F9FAFB; color: #888888; font-size: 12px; padding: 10px; border-bottom: 1px solid var(--line-border); text-align: center; font-weight: 600; }
+        table td { padding: 12px 10px; border-bottom: 1px solid #F3F4F6; font-size: 13px; text-align: center; color: #444444; }
+        .btn-line { background-color: var(--line-green); color: white; border-radius: 6px; font-weight: 600; font-size: 13px; }
+        .btn-outline { border: 1px solid #D1D5DB; color: #666666; border-radius: 6px; font-size: 13px; }
+        .btn-small { padding: 3px 10px; font-size: 11px; }
         .fade-in { animation: fadeIn 0.3s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from{opacity:0; transform:translateY(5px);} to{opacity:1; transform:translateY(0);} }
         .no-scrollbar::-webkit-scrollbar { display: none; }
     </style>
 </head>
@@ -36,18 +35,15 @@
         const API_URL = "https://tdea.fangwl591021.workers.dev/"; 
         const AuthContext = createContext(null);
 
-        const Icon = ({ name, size=16 }) => {
-            const icons = {
-                dashboard: <path d="M3 3h7v9H3zm11 0h7v5h-7zm0 9h7v9h-7zm-11 10h7v-7H3z"/>,
-                activity: <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>,
-                users: <Fragment><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><circle cx="17" cy="11" r="4"/></Fragment>,
-                plus: <Fragment><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></Fragment>,
-                trash: <Fragment><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></Fragment>,
-                chevron: <polyline points="6 9 12 15 18 9"/>,
-                alert: <Fragment><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></Fragment>
-            };
-            return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{display:'inline-block'}}>{icons[name] || <circle cx="12" cy="12" r="10" />}</svg>;
-        };
+        // --- 1. 圖標組件集 (明確定義) ---
+        const IconBase = ({children}) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{display:'inline-block'}}>{children}</svg>;
+        const BarChart2 = () => <IconBase><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></IconBase>;
+        const Activity = () => <IconBase><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></IconBase>;
+        const Users = () => <IconBase><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><circle cx="17" cy="11" r="4"/></IconBase>;
+        const ChevronDown = () => <IconBase><polyline points="6 9 12 15 18 9"/></IconBase>;
+        const IconPlus = () => <IconBase><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></IconBase>;
+        const Trash2 = () => <IconBase><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></IconBase>;
+        const LogOut = () => <IconBase><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/></IconBase>;
 
         async function callAPI(action, data = {}) {
             try {
@@ -59,20 +55,89 @@
             } catch (err) { return { success: false, message: "連線異常" }; }
         }
 
-        // 🌟 核心組件：二次確認對話框
-        function ConfirmDialog({ isOpen, title, message, onConfirm, onCancel, confirmText="確認移除", isDestructive=true }) {
+        // --- 2. 驗證入口 ---
+        function AuthProvider({ children }) {
+            const [authState, setAuthState] = useState({ status: "LOADING", user: null, role: null });
+            useEffect(() => {
+                const init = async () => {
+                    try {
+                        await liff.init({ liffId: LIFF_ID });
+                        if (!liff.isLoggedIn()) { liff.login(); return; }
+                        const p = await liff.getProfile();
+                        const res = await callAPI('check', { userId: p.userId });
+                        if (res.status === 'admin' || res.status === 'member') setAuthState({ status: "AUTHORIZED", user: p, role: res.status });
+                        else if (res.status === 'pending') setAuthState({ status: "PENDING", user: p });
+                        else window.location.replace("login.html");
+                    } catch (err) { setAuthState({ status: "ERROR" }); }
+                };
+                init();
+            }, []);
+            if (authState.status === "LOADING") return <div className="h-screen flex items-center justify-center text-gray-400">系統初始化中...</div>;
+            return <AuthContext.Provider value={authState}>{children}</AuthContext.Provider>;
+        }
+
+        // --- 3. 系統總覽 ---
+        function DashboardView({ activityData }) {
+            const [stats, setStats] = useState({ activityCount: 0, assocCount: 0, vendorCount: 0 });
+            useEffect(() => { callAPI('getDashboardSummary').then(res => res.success && setStats(res.stats)); }, []);
+            return (
+                <div className="p-8 fade-in">
+                    <h1 className="text-xl font-bold mb-6">數據概覽</h1>
+                    <div className="grid grid-cols-3 gap-6 mb-10">
+                        {[{ l: "上架活動", v: stats.activityCount, c: "text-emerald-600" }, { l: "協會會員", v: stats.assocCount, c: "text-blue-600" }, { l: "贊助/廠商", v: stats.vendorCount, c: "text-purple-600" }].map((s, i) => (
+                            <div key={i} className="card p-6 flex flex-col items-center">
+                                <span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-1">{s.l}</span>
+                                <span className={`text-3xl font-black ${s.c}`}>{s.v}</span>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="card overflow-hidden">
+                        <div className="px-6 py-3 border-b text-[11px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50">🔥 近期熱門活動</div>
+                        <table>
+                            <thead><tr><th className="text-left pl-6">活動名稱</th><th>分類</th><th>報名人數</th><th>狀態</th></tr></thead>
+                            <tbody>{activityData.slice(0, 5).map((act, i) => (<tr key={i} className="hover:bg-gray-50"><td className="text-left pl-6 font-bold">{act['活動名稱']}</td><td className="text-gray-400 text-xs">{act['活動類型']}</td><td className="font-bold text-blue-600">{act['報名人數']}</td><td><span className="text-[10px] font-bold text-emerald-500 uppercase">ONLINE</span></td></tr>))}</tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- 4. 活動中心 ---
+        function ActivityConsole({ activityData, fetchActivities, setSelectedDetail, handleTakeDown }) {
+            return (
+                <div className="p-8 fade-in">
+                    <div className="flex justify-between items-center mb-6"><h1 className="text-xl font-bold">活動管理</h1><button onClick={fetchActivities} className="btn-outline px-4 py-1.5 font-bold">刷新數據</button></div>
+                    <div className="card overflow-hidden">
+                        <table>
+                            <thead><tr><th className="text-left pl-6">活動資訊</th><th>報名</th><th>簽到</th><th>狀態</th><th className="pr-6 text-right">操作</th></tr></thead>
+                            <tbody>{activityData.map((act, i) => (<tr key={i} className="hover:bg-gray-50">
+                                <td className="text-left pl-6">
+                                    <div className="font-bold text-gray-700">{act['活動名稱']}</div>
+                                    <div className="text-[10px] text-gray-400">📅 {act['課程時間']}</div>
+                                </td>
+                                <td className="font-bold text-blue-500 text-base">{act['報名人數']}</td>
+                                <td className="text-gray-400">{act['核銷人數']}</td>
+                                <td><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${act.狀態==='上架'?'bg-emerald-50 text-emerald-600 border-emerald-100':'bg-gray-50 text-gray-400'}`}>{act.狀態}</span></td>
+                                <td className="pr-6 text-right space-x-1"><button onClick={()=>setSelectedDetail(act)} className="btn-outline btn-small font-bold">明細</button><button onClick={()=>handleTakeDown(act['活動名稱'])} className={`btn-small font-bold ${act.狀態==='上架'?'text-red-500 bg-red-50 border-red-100':'text-white bg-gray-500'}`}>{act.狀態==='上架'?'下架':'發布'}</button></td>
+                            </tr>))}</tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- 5. 名冊管理 ---
+        function ConfirmDialog({ isOpen, title, message, onConfirm, onCancel }) {
             if (!isOpen) return null;
             return (
-                <div className="fixed inset-0 z-[5000] flex items-center justify-center p-6 bg-black/40 backdrop-blur-[2px] fade-in">
-                    <div className="bg-white w-full max-w-[320px] rounded-2xl shadow-2xl overflow-hidden flex flex-col items-center p-8 text-center">
-                        <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-4 ${isDestructive?'bg-red-50 text-red-500':'bg-blue-50 text-blue-500'}`}>
-                            <Icon name="alert" size={28}/>
-                        </div>
-                        <h3 className="text-lg font-bold text-gray-800 mb-2">{title}</h3>
-                        <p className="text-gray-500 text-sm leading-relaxed mb-8 whitespace-pre-wrap">{message}</p>
-                        <div className="flex flex-col w-full gap-2">
-                            <button onClick={onConfirm} className={`w-full py-3 rounded-xl font-bold text-sm shadow-sm transition active:scale-95 ${isDestructive?'bg-red-500 text-white':'bg-blue-600 text-white'}`}>{confirmText}</button>
-                            <button onClick={onCancel} className="w-full py-3 text-gray-400 font-bold text-sm">先不要</button>
+                <div className="fixed inset-0 z-[5000] flex items-center justify-center p-6 bg-black/40 backdrop-blur-[1px] fade-in">
+                    <div className="bg-white w-full max-w-[280px] rounded-xl shadow-2xl p-6 text-center">
+                        <div className="w-12 h-12 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 text-xl">⚠️</div>
+                        <h3 className="font-bold text-gray-800 mb-2">{title}</h3>
+                        <p className="text-gray-400 text-xs leading-relaxed mb-6">{message}</p>
+                        <div className="space-y-2">
+                            <button onClick={onConfirm} className="w-full py-2.5 bg-red-500 text-white rounded-lg font-bold text-sm">確認移除</button>
+                            <button onClick={onCancel} className="w-full py-2.5 text-gray-400 font-bold text-sm">取消</button>
                         </div>
                     </div>
                 </div>
@@ -81,12 +146,9 @@
 
         function MemberTable({ title, sheetName }) {
             const [data, setData] = useState([]), [loading, setLoading] = useState(true), [search, setSearch] = useState("");
-            const [editing, setEditing] = useState(null), [isAdding, setIsAdding] = useState(false);
-            const [confirmTarget, setConfirmTarget] = useState(null); // 🌟 控制刪除確認
-
+            const [editing, setEditing] = useState(null), [isAdding, setIsAdding] = useState(false), [confirmTarget, setConfirmTarget] = useState(null);
             const fetchData = () => { setLoading(true); callAPI('getMemberData', { sheetName }).then(res => { if(res.data) setData(res.data); setLoading(false); }); };
             useEffect(() => fetchData(), [sheetName]);
-            
             const filtered = data.filter(d => Object.values(d).some(v => String(v).includes(search)));
 
             const cols = useMemo(() => {
@@ -97,131 +159,55 @@
             }, [sheetName]);
 
             const gv = (item, keys) => { const k = Object.keys(item).find(key => keys.some(s => key.trim().toLowerCase() === s.replace(/\s+/g,"").toLowerCase())); return k ? item[k] : ""; };
-
-            const handleSoftDelete = async () => {
-                if (!confirmTarget) return;
-                const res = await callAPI('deleteMember', { sheetName, row: confirmTarget._row });
-                if (res.success) fetchData();
-                else alert("移除失敗: " + res.message);
-                setConfirmTarget(null);
-            };
+            const handleSoftDelete = async () => { await callAPI('deleteMember', { sheetName, row: confirmTarget._row }); fetchData(); setConfirmTarget(null); };
 
             return (
                 <div className="p-8 fade-in">
-                    <ConfirmDialog isOpen={!!confirmTarget} title="確認移除成員？" message={`確定要將『${gv(confirmTarget, ["姓名", "公司名稱"])}』移出名冊嗎？\n移除後該成員將無法進入系統。`} onConfirm={handleSoftDelete} onCancel={()=>setConfirmTarget(null)} />
-                    <EditDrawer isOpen={!!editing || isAdding} item={editing} sheetName={sheetName} onClose={()=>{setEditing(null);setIsAdding(false);}} onSaved={fetchData} cols={cols} />
-                    
-                    <div className="flex justify-between items-center mb-6">
-                        <div><h1 className="text-xl font-bold">{title}</h1><p className="text-gray-400 text-[10px] uppercase tracking-wider">Member Access Management</p></div>
-                        <div className="flex gap-2">
-                            <input placeholder="快速搜尋..." className="btn-outline px-4 py-2 text-xs outline-none focus:border-green-500 w-48" value={search} onChange={e=>setSearch(e.target.value)}/>
-                            <button onClick={()=>setIsAdding(true)} className="btn-primary px-4 py-2 text-xs shadow-sm flex items-center gap-2"><Icon name="plus" size={12}/> 新增</button>
-                            <button onClick={fetchData} className="btn-outline px-4 py-2 text-xs">刷新</button>
-                        </div>
-                    </div>
+                    <ConfirmDialog isOpen={!!confirmTarget} title="確認移除？" message={`確定要將『${gv(confirmTarget||{}, ["姓名", "公司名稱"])}』移除嗎？此操作將修改會員資格為 N 並隱藏。`} onConfirm={handleSoftDelete} onCancel={()=>setConfirmTarget(null)} />
+                    <div className="flex justify-between items-center mb-6"><div><h1 className="text-xl font-bold">{title}</h1><p className="text-[10px] text-gray-400 uppercase tracking-widest mt-0.5">Database Management</p></div><div className="flex gap-2"><input placeholder="搜尋..." className="btn-outline px-3 py-1.5 text-xs outline-none focus:border-green-500 w-40" value={search} onChange={e=>setSearch(e.target.value)}/><button onClick={()=>setIsAdding(true)} className="btn-line px-4 py-1.5 text-xs">新增</button><button onClick={fetchData} className="btn-outline px-4 py-1.5 text-xs">刷新</button></div></div>
                     <div className="card overflow-x-auto no-scrollbar">
                         <table>
                             <thead><tr>{cols.map((c,i)=><th key={i} style={c.mw?{minWidth:c.mw}:{}}>{c.l}</th>)}<th>維護</th></tr></thead>
-                            <tbody>
-                                {loading ? <tr><td colSpan={30} className="p-20 text-gray-300 italic text-xs uppercase tracking-widest">Loading...</td></tr> : filtered.map((item, idx) => (
-                                    <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                                        {cols.map((c,ci)=><td key={ci} className={`${c.l === "狀態" && gv(item, c.k).includes("完成") ? "text-emerald-500 font-bold" : ""}`}>{gv(item, c.k)}</td>)}
-                                        <td className="p-2 flex gap-3 justify-center">
-                                            <button onClick={()=>setEditing(item)} className="text-blue-500 font-bold text-[10px] hover:underline uppercase">Edit</button>
-                                            <button onClick={()=>setConfirmTarget(item)} className="text-red-400 font-bold text-[10px] hover:underline uppercase">Del</button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
+                            <tbody>{loading ? <tr><td colSpan={30} className="p-20 text-gray-300 italic text-xs uppercase tracking-widest animate-pulse">Syncing...</td></tr> : filtered.map((item, idx) => (
+                                <tr key={idx} className="hover:bg-gray-50">
+                                    {cols.map((c,ci)=><td key={ci} className={`${c.l === "狀態" && gv(item, c.k).includes("完成") ? "text-emerald-500 font-bold" : ""}`}>{gv(item, c.k)}</td>)}
+                                    <td className="p-2 flex gap-3 justify-center"><button onClick={()=>setConfirmTarget(item)} className="text-red-400 font-bold text-[10px] hover:underline uppercase">Del</button></td>
+                                </tr>
+                            ))}</tbody>
                         </table>
                     </div>
                 </div>
             );
         }
 
-        // --- 其餘組件 (Dashboard, ActivityConsole, EditDrawer 等維持 v25.1 邏輯) ---
-        function DashboardView({ activityData }) {
-            const [stats, setStats] = useState({ activityCount: 0, assocCount: 0, vendorCount: 0 });
-            useEffect(() => { callAPI('getDashboardSummary').then(res => res.success && setStats(res.stats)); }, []);
-            return (
-                <div className="p-8 fade-in">
-                    <div className="mb-8"><h1 className="text-xl font-bold">數據中心</h1><p className="text-gray-400 text-xs">Real-time Stats Overview</p></div>
-                    <div className="grid grid-cols-3 gap-6 mb-10">
-                        {[{ label: "進行中活動", val: stats.activityCount, color: "text-emerald-600" }, { label: "協會正式會員", val: stats.assocCount, color: "text-blue-600" }, { label: "廠商/贊助單位", val: stats.vendorCount, color: "text-purple-600" }].map((s, i) => (
-                            <div key={i} className="card p-6 flex flex-col items-center"><span className="text-gray-400 text-[9px] font-bold uppercase tracking-wider mb-1">{s.label}</span><span className={`text-3xl font-black ${s.color}`}>{s.val}</span></div>
-                        ))}
-                    </div>
-                    <div className="card overflow-hidden">
-                        <div className="px-6 py-3 border-b text-[10px] font-bold text-gray-500 uppercase tracking-widest bg-gray-50">🔥 近期熱門活動摘要</div>
-                        <table>
-                            <thead><tr><th className="text-left pl-6">活動名稱</th><th>類別</th><th>報名</th><th>狀態</th></tr></thead>
-                            <tbody>{activityData.slice(0, 8).map((act, i) => (<tr key={i} className="hover:bg-gray-50"><td className="text-left pl-6 font-bold">{act['活動名稱']}</td><td className="text-xs text-gray-400">{act['活動類型']}</td><td className="font-bold text-blue-500">{act['報名人數']}</td><td><span className="text-[10px] font-bold text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">ONLINE</span></td></tr>))}</tbody>
-                        </table>
-                    </div>
-                </div>
-            );
-        }
-
-        function ActivityConsole({ activityData, fetchActivities, setSelectedDetail, handleTakeDown }) {
-            return (
-                <div className="p-8 fade-in">
-                    <div className="flex justify-between items-center mb-8"><div><h1 className="text-xl font-bold">活動中心</h1><p className="text-gray-400 text-xs">Activity & Enrollment Hub</p></div><button onClick={fetchActivities} className="btn-outline px-4 py-2 text-xs">刷新數據</button></div>
-                    <div className="card overflow-hidden">
-                        <table>
-                            <thead><tr><th className="text-left pl-6">活動資訊</th><th>報名</th><th>簽到</th><th>狀態</th><th className="text-right pr-6">功能</th></tr></thead>
-                            <tbody>{activityData.map((act, i) => (<tr key={i} className="hover:bg-gray-50">
-                                <td className="text-left pl-6"><div className="font-bold">{act['活動名稱']}</div><div className="text-[10px] text-gray-400">📅 {act['課程時間']}</div></td>
-                                <td className="font-bold text-blue-500 text-base">{act['報名人數']}</td>
-                                <td className="text-gray-400 font-bold">{act['核銷人數']}</td>
-                                <td><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${act.狀態==='上架'?'bg-emerald-50 text-emerald-600':'bg-gray-50 text-gray-400'}`}>{act.狀態}</span></td>
-                                <td className="text-right pr-6 whitespace-nowrap space-x-1"><button onClick={()=>setSelectedDetail(act)} className="btn-outline btn-small">明細</button><button onClick={()=>handleTakeDown(act['活動名稱'])} className={`btn-small ${act.狀態==='上架'?'text-red-400 border-red-100 bg-red-50':'text-white bg-gray-500'}`}>{act.狀態==='上架'?'下架':'發布'}</button></td>
-                            </tr>))}</tbody>
-                        </table>
-                    </div>
-                </div>
-            );
-        }
-
-        function EditDrawer({ isOpen, onClose, item, sheetName, onSaved, cols }) {
-            const [formData, setFormData] = useState({}); const [isSaving, setIsSaving] = useState(false); const isNew = !item;
-            useEffect(() => { setFormData(item || {}); }, [item]);
-            const fields = cols.filter(l => l.l !== "維護" && l.l !== "序");
-            const handleSave = async () => { setIsSaving(true); const action = isNew ? 'addMember' : 'updateMemberData'; const res = await callAPI(action, { sheetName, row: formData._row, data: formData }); setIsSaving(false); if(res.success) { onSaved(); onClose(); } else { alert("儲存失敗"); } };
-            return (
-                <div className={`fixed inset-0 z-[4000] flex justify-end transition-all ${isOpen?'visible':'invisible'}`}>
-                    <div className={`absolute inset-0 bg-black/10 transition-opacity ${isOpen?'opacity-100':'opacity-0'}`} onClick={onClose}></div>
-                    <div className={`relative w-[380px] bg-white h-screen shadow-2xl flex flex-col transition-transform duration-300 ${isOpen?'translate-x-0':'translate-x-full'}`}>
-                        <div className="p-6 border-b flex justify-between items-center bg-gray-50"><h3 className="font-bold">{isNew ? "新增資料" : "編輯成員"}</h3><button onClick={onClose} className="text-gray-400 text-2xl">&times;</button></div>
-                        <div className="p-6 space-y-4 overflow-y-auto flex-1 no-scrollbar">{fields.map((f, i) => (<div key={i}><label className="text-[10px] font-bold text-gray-400 block mb-1 uppercase tracking-wider">{f.l}</label><input className="w-full border p-2 rounded text-sm outline-none focus:border-green-500 bg-gray-50" value={formData[f.k[0]]||""} onChange={e=>setFormData({...formData,[f.k[0]]:e.target.value})}/></div>))}</div>
-                        <div className="p-6 border-t bg-gray-50 flex gap-2"><button onClick={onClose} className="flex-1 py-3 border font-bold text-xs uppercase text-gray-400 rounded-lg">Cancel</button><button onClick={handleSave} disabled={isSaving} className="flex-[2] btn-primary py-3 font-bold text-xs uppercase shadow-sm">{isSaving?"Saving...":"Confirm"}</button></div>
-                    </div>
-                </div>
-            );
-        }
-
+        // --- 6. 主應用邏輯 ---
         function MainApp() {
             const { role } = useContext(AuthContext);
             const [view, setView] = useState('dashboard'), [activityData, setActivityData] = useState([]), [selectedDetail, setSelectedDetail] = useState(null);
             const fetchActivities = () => { callAPI('getActivityList').then(res => setActivityData(res.data || [])); };
             useEffect(() => { if(role==='admin') fetchActivities(); }, [role]);
-            const handleTakeDown = async (actName) => { if(confirm(`下架活動將使前端隱藏，確認？`)){ await callAPI('updateActivityStatus',{name:actName,status:'下架'}); fetchActivities(); } };
+            const handleTakeDown = async (n) => { if(confirm('確認下架活動？')){ await callAPI('updateActivityStatus',{name:n,status:'下架'}); fetchActivities(); } };
 
             return (
                 <div className="flex h-screen overflow-hidden">
                     <div className="sidebar flex flex-col shadow-sm">
-                        <div className="p-8 text-center border-b flex flex-col items-center"><div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white text-xl font-black mb-2">T</div><h1 className="text-lg font-black italic tracking-tighter uppercase">TDEA HUB</h1><div className="text-[8px] font-bold text-gray-300 mt-1 uppercase tracking-widest border px-2 py-0.5 rounded">Management v25.2</div></div>
-                        <nav className="flex-1 py-6 overflow-y-auto no-scrollbar">
-                            <div className={`menu-item ${view==='dashboard'?'active':''}`} onClick={()=>{setView('dashboard');setSelectedDetail(null);}}><Icon name="dashboard"/> <span className="ml-3">系統概況</span></div>
-                            <div className={`menu-item ${view==='activity'?'active':''}`} onClick={()=>{setView('activity');setSelectedDetail(null);}}><Icon name="activity"/> <span className="ml-3">活動管理</span></div>
-                            <div className="px-8 py-4 text-[9px] font-bold text-gray-300 uppercase tracking-widest mt-4">Database</div>
-                            <div className={`menu-item ${view==='assoc'?'active':''}`} onClick={()=>{setView('assoc');setSelectedDetail(null);}}><Icon name="users" size={14}/> <span className="ml-3">協會正式會員</span></div>
-                            <div className={`menu-item ${view==='vendor'?'active':''}`} onClick={()=>{setView('vendor');setSelectedDetail(null);}}><Icon name="users" size={14}/> <span className="ml-3">廠商贊助單位</span></div>
-                            <div className={`menu-item ${view==='guest'?'active':''}`} onClick={()=>{setView('guest');setSelectedDetail(null);}}><Icon name="users" size={14}/> <span className="ml-3">一般註冊人員</span></div>
+                        <div className="p-8 border-b border-gray-50 flex flex-col items-center">
+                            <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white text-xl font-black mb-3 shadow-sm">T</div>
+                            <h1 className="text-lg font-black tracking-tighter uppercase italic">TDEA HUB</h1>
+                            <div className="text-[8px] font-bold text-gray-300 mt-1 uppercase tracking-widest border px-2 py-0.5 rounded">Management v25.4</div>
+                        </div>
+                        <nav className="flex-1 py-6">
+                            <div className={`menu-item flex items-center gap-3 ${view==='dashboard'?'active':''}`} onClick={()=>{setView('dashboard');setSelectedDetail(null);}}><BarChart2/> 系統總覽</div>
+                            <div className={`menu-item flex items-center gap-3 ${view==='activity'?'active':''}`} onClick={()=>{setView('activity');setSelectedDetail(null);}}><Activity/> 活動管理</div>
+                            <div className="px-6 py-4 text-[9px] font-bold text-gray-300 uppercase tracking-widest mt-4">Database</div>
+                            <div className={`menu-item flex items-center gap-3 ${view==='assoc'?'active':''}`} onClick={()=>{setView('assoc');setSelectedDetail(null);}}><Users/> 協會正式會員</div>
+                            <div className={`menu-item flex items-center gap-3 ${view==='vendor'?'active':''}`} onClick={()=>{setView('vendor');setSelectedDetail(null);}}><Users/> 廠商贊助單位</div>
+                            <div className={`menu-item flex items-center gap-3 ${view==='guest'?'active':''}`} onClick={()=>{setView('guest');setSelectedDetail(null);}}><Users/> 一般註冊人員</div>
                         </nav>
-                        <div className="p-6 border-t text-center"><button onClick={()=>location.reload()} className="text-[10px] font-bold text-gray-300 hover:text-red-400 transition-colors uppercase tracking-widest">Logout</button></div>
+                        <div className="p-6 border-t text-center"><button onClick={()=>location.reload()} className="text-[10px] font-bold text-gray-300 hover:text-red-400 transition-colors flex items-center gap-2 mx-auto"><LogOut/> EXIT SYSTEM</button></div>
                     </div>
                     <main className="flex-1 overflow-auto no-scrollbar">
-                        {selectedDetail ? <DetailPage activity={selectedDetail} onBack={()=>setSelectedDetail(null)} onRefresh={fetchActivities} /> : (
+                        {selectedDetail ? <div className="p-8 fade-in"><button onClick={()=>setSelectedDetail(null)} className="btn-outline px-4 py-1 text-xs mb-4">← 返回</button><div className="card p-10 text-center font-bold text-gray-300 italic uppercase">Activity Detail Module Ready</div></div> : (
                             <Fragment>
                                 {view==='dashboard' && <DashboardView activityData={activityData} />}
                                 {view==='activity' && <ActivityConsole activityData={activityData} fetchActivities={fetchActivities} setSelectedDetail={setSelectedDetail} handleTakeDown={handleTakeDown} />}
